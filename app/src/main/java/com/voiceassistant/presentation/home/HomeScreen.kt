@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,17 +47,32 @@ import com.voiceassistant.presentation.theme.VaDimens
 fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val extras = LocalVaExtra.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    fun hideKeyboard() {
+        focusManager.clearFocus()
+        keyboardController?.hide()
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .pointerInput(focusManager, keyboardController) {
+                detectTapGestures(
+                    onTap = {
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
+                    }
+                )
+            }
             .padding(horizontal = VaDimens.screenHorizontal, vertical = VaDimens.screenTop)
     ) {
         VaBrandMark()
         Spacer(Modifier.height(6.dp))
         Text(
-            "Quick TTS · nghe ngay từng câu",
+            "Dán văn bản và nghe ngay",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -70,7 +89,7 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
             items(state.voices, key = { it.id }) { voice ->
                 VaVoiceChip(
                     label = voice.name,
-                    subtitle = if (voice.isPreset) "preset" else "cloned",
+                    subtitle = if (voice.isPreset) "Có sẵn" else "Đã lưu",
                     selected = voice.id == state.selectedVoiceId,
                     onClick = { viewModel.onVoiceSelected(voice.id) }
                 )
@@ -86,7 +105,7 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                 .weight(1f),
             placeholder = {
                 Text(
-                    "Dán văn bản dài — app chia câu, stream PCM, không chờ cả đoạn…",
+                    "Nhập hoặc dán văn bản cần đọc…",
                     style = MaterialTheme.typography.bodyLarge
                 )
             },
@@ -135,22 +154,42 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                 modifier = Modifier.weight(1.2f)
             ) { playing ->
                 if (playing) {
-                    VaPrimaryButton(text = "Dừng", onClick = viewModel::stop, modifier = Modifier.fillMaxWidth())
+                    VaPrimaryButton(
+                        text = "Dừng",
+                        onClick = {
+                            hideKeyboard()
+                            viewModel.stop()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 } else {
-                    VaPrimaryButton(text = "Phát", onClick = viewModel::play, modifier = Modifier.fillMaxWidth())
+                    VaPrimaryButton(
+                        text = "Phát",
+                        onClick = {
+                            hideKeyboard()
+                            viewModel.play()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
             Spacer(Modifier.width(8.dp))
             VaGhostButton(
                 text = "Xuất",
-                onClick = viewModel::exportAudio,
+                onClick = {
+                    hideKeyboard()
+                    viewModel.exportAudio()
+                },
                 modifier = Modifier.weight(1f),
                 enabled = !state.isPlaying
             )
             Spacer(Modifier.width(8.dp))
             VaGhostButton(
                 text = "Chia sẻ",
-                onClick = viewModel::shareLastExport,
+                onClick = {
+                    hideKeyboard()
+                    viewModel.shareLastExport()
+                },
                 modifier = Modifier.weight(1f),
                 enabled = !state.isPlaying
             )

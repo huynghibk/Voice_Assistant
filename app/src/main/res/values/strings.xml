@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Trợ lý Giọng nói</string>
-    <string name="app_name_en">Voice Assistant</string>
+    <string name="app_name">VoiceAssistant</string>
 </resources>

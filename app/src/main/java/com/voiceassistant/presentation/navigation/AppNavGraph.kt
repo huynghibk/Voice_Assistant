@@ -44,7 +44,7 @@ sealed class Dest(val route: String, val label: String, val icon: ImageVector) {
     data object Projects : Dest("projects", "Projects", Icons.Outlined.Folder)
     data object Voices : Dest("voices", "Voices", Icons.Outlined.Mic)
     data object Timeline : Dest("timeline", "Studio", Icons.Outlined.Timeline)
-    data object Settings : Dest("settings", "More", Icons.Outlined.Settings)
+    data object Settings : Dest("settings", "Cài đặt", Icons.Outlined.Settings)
 }
 
 private val bottomDestinations = listOf(

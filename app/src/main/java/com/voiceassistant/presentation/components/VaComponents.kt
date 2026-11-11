@@ -60,12 +60,12 @@ fun VaBrandMark(modifier: Modifier = Modifier) {
         Spacer(Modifier.width(10.dp))
         Column {
             Text(
-                "Voice Assistant",
+                "VoiceAssistant",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                "Trợ lý Giọng nói",
+                "Listen · Clone · Export",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

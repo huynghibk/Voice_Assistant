@@ -67,7 +67,7 @@ class HomeViewModel @Inject constructor(
             audioRoutingManager.route.collect { route ->
                 _uiState.update {
                     it.copy(
-                        routeLabel = "${route.deviceName} · buf×${route.bufferMultiplier}",
+                        routeLabel = route.deviceName,
                         bufferMultiplier = route.bufferMultiplier
                     )
                 }

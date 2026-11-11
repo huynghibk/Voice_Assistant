@@ -50,7 +50,7 @@ class AudioRoutingManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private val mediaRouter: MediaRouter = MediaRouter.getInstance(context)
+    private val mediaRouter: MediaRouter? = runCatching { MediaRouter.getInstance(context) }.getOrNull()
 
     private val _route = MutableStateFlow(resolveRoute())
     val route: StateFlow<AudioRouteState> = _route.asStateFlow()
@@ -95,16 +95,15 @@ class AudioRoutingManager @Inject constructor(
     fun start() {
         if (started) return
         started = true
-        audioManager.registerAudioDeviceCallback(deviceCallback, handler)
-        context.registerReceiver(
-            noisyReceiver,
-            IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
-        )
-        mediaRouter.addCallback(
-            castSelector,
-            mediaRouterCallback,
-            MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY
-        )
+        runCatching { audioManager.registerAudioDeviceCallback(deviceCallback, handler) }
+        runCatching { registerNoisyReceiver() }
+        runCatching {
+            mediaRouter?.addCallback(
+                castSelector,
+                mediaRouterCallback,
+                MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY
+            )
+        }
         // Prefer media stream for A2DP when Bluetooth is connected
         runCatching { audioManager.mode = AudioManager.MODE_NORMAL }
         refresh()
@@ -115,7 +114,7 @@ class AudioRoutingManager @Inject constructor(
         started = false
         runCatching { audioManager.unregisterAudioDeviceCallback(deviceCallback) }
         runCatching { context.unregisterReceiver(noisyReceiver) }
-        runCatching { mediaRouter.removeCallback(mediaRouterCallback) }
+        runCatching { mediaRouter?.removeCallback(mediaRouterCallback) }
     }
 
     fun refresh() {
@@ -123,10 +122,23 @@ class AudioRoutingManager @Inject constructor(
     }
 
     fun selectedCastRoute(): MediaRouter.RouteInfo? =
-        mediaRouter.selectedRoute.takeIf { !it.isDefault && it.matchesSelector(castSelector) }
+        mediaRouter?.selectedRoute?.takeIf { !it.isDefault && it.matchesSelector(castSelector) }
+
+    private fun registerNoisyReceiver() {
+        val filter = IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+        // API 33+ (and target 34 emulator) requires an explicit export flag.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(noisyReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            context.registerReceiver(noisyReceiver, filter)
+        }
+    }
 
     private fun resolveRoute(): AudioRouteState {
-        val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        val devices = runCatching {
+            audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        }.getOrDefault(emptyArray())
         val castRoute = selectedCastRoute()
         if (castRoute != null) {
             return AudioRouteState(
@@ -143,7 +155,7 @@ class AudioRoutingManager @Inject constructor(
                 it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
                 (Build.VERSION.SDK_INT >= 31 && it.type == AudioDeviceInfo.TYPE_BLE_HEADSET)
         }
-        if (bluetooth != null || audioManager.isBluetoothA2dpOn) {
+        if (bluetooth != null || runCatching { audioManager.isBluetoothA2dpOn }.getOrDefault(false)) {
             val name = bluetooth?.productName?.toString()
                 ?: "Tai nghe Bluetooth"
             return AudioRouteState(
@@ -159,7 +171,7 @@ class AudioRoutingManager @Inject constructor(
                 it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
                 it.type == AudioDeviceInfo.TYPE_USB_HEADSET
         }
-        if (wired != null || audioManager.isWiredHeadsetOn) {
+        if (wired != null || runCatching { audioManager.isWiredHeadsetOn }.getOrDefault(false)) {
             return AudioRouteState(
                 kind = AudioOutputKind.WIRED_HEADSET,
                 deviceName = wired?.productName?.toString() ?: "Tai nghe có dây",
@@ -187,5 +199,7 @@ class AudioRoutingManager @Inject constructor(
     }
 
     private fun hasCastRoutes(): Boolean =
-        mediaRouter.routes.any { !it.isDefault && it.matchesSelector(castSelector) }
+        runCatching {
+            mediaRouter?.routes?.any { !it.isDefault && it.matchesSelector(castSelector) } == true
+        }.getOrDefault(false)
 }

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.VoiceAssistant" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- AppCompat/Material required by MediaRouter; plain android.Theme crashes on start. -->
+    <style name="Theme.VoiceAssistant" parent="Theme.AppCompat.DayNight.NoActionBar" />
 </resources>

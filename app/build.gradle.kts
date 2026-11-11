@@ -48,6 +48,10 @@ android {
         resources {
             excludes.addAll(setOf("/META-INF/{AL2.0,LGPL2.1}", "META-INF/depends.txt"))
         }
+        jniLibs {
+            // Helps onnxruntime / ffmpeg-kit load correctly on x86_64 emulators
+            useLegacyPackaging = true
+        }
     }
 }
 

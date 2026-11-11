@@ -38,29 +38,29 @@ class VoiceRepositoryImpl @Inject constructor(
     }
 
     override suspend fun seedPresetsIfEmpty() {
-        if (dao.count() > 0) return
+        // Upsert built-in voices so label/default updates apply on existing installs too.
         val presets = listOf(
             VoiceModel(
-                id = "preset_en_amy",
-                name = "Amy (EN)",
-                tags = listOf("system", "en", "female"),
-                modelAssetPath = "models/piper/en_US-amy-low.onnx",
+                id = "preset_vi_demo",
+                name = "Tiếng Việt",
+                tags = listOf("system", "vi", "female"),
+                modelAssetPath = "models/piper/vi_VN-demo-low.onnx",
                 isDefault = true,
                 isPreset = true
             ),
             VoiceModel(
-                id = "preset_en_ryan",
-                name = "Ryan (EN)",
-                tags = listOf("system", "en", "male"),
-                modelAssetPath = "models/piper/en_US-ryan-low.onnx",
+                id = "preset_en_amy",
+                name = "English · Amy",
+                tags = listOf("system", "en", "female"),
+                modelAssetPath = "models/piper/en_US-amy-low.onnx",
                 isDefault = false,
                 isPreset = true
             ),
             VoiceModel(
-                id = "preset_vi_demo",
-                name = "Linh (VI Demo)",
-                tags = listOf("system", "vi", "female"),
-                modelAssetPath = "models/piper/vi_VN-demo-low.onnx",
+                id = "preset_en_ryan",
+                name = "English · Ryan",
+                tags = listOf("system", "en", "male"),
+                modelAssetPath = "models/piper/en_US-ryan-low.onnx",
                 isDefault = false,
                 isPreset = true
             )

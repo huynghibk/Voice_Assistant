@@ -19,20 +19,19 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.coroutineContext
-import kotlin.math.PI
-import kotlin.math.sin
 
 /**
  * Piper ONNX TTS with sentence queue + streaming emission.
  *
  * When a Piper `.onnx` model is present under assets/filesDir, runs real inference.
- * Otherwise falls back to [DemoToneSynthesizer] so the streaming pipeline is testable
- * before model packs are downloaded.
+ * Otherwise falls back to [AndroidSystemTtsSynthesizer] so users hear real speech
+ * (not a demo tone) before model packs are downloaded.
  */
 @Singleton
 class PiperTtsEngine @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val textSplitter: TextSplitter
+    private val textSplitter: TextSplitter,
+    private val androidSystemTtsSynthesizer: AndroidSystemTtsSynthesizer
 ) : TtsEngine {
 
     private val cancelled = AtomicBoolean(false)
@@ -46,26 +45,29 @@ class PiperTtsEngine @Inject constructor(
 
         val modelPath = resolveModelPath(voice.modelAssetPath)
         val useOnnx = modelPath != null
+        val localeHint = AndroidSystemTtsSynthesizer.localeForVoiceId(voice.id, voice.name)
 
         sentences.forEachIndexed { index, sentence ->
             if (cancelled.get() || !coroutineContext.isActive) {
                 throw CancellationException("TTS cancelled")
             }
-            val pcm = if (useOnnx) {
-                runCatching { inferWithOnnx(modelPath!!, sentence) }
-                    .getOrElse { DemoToneSynthesizer.synthesize(sentence, SAMPLE_RATE) }
+            val (pcm, sampleRate) = if (useOnnx) {
+                runCatching {
+                    inferWithOnnx(modelPath!!, sentence) to SAMPLE_RATE
+                }.getOrElse {
+                    androidSystemTtsSynthesizer.synthesize(sentence, localeHint)
+                }
             } else {
-                DemoToneSynthesizer.synthesize(sentence, SAMPLE_RATE)
+                androidSystemTtsSynthesizer.synthesize(sentence, localeHint)
             }
-            // Short pause after sentence punctuation for natural prosody
-            val withPause = appendSilence(pcm, (SAMPLE_RATE * 0.25).toInt())
+            val withPause = appendSilence(pcm, (sampleRate * 0.25).toInt())
             emit(
                 PcmChunk(
                     sentenceIndex = index,
                     sentenceCount = sentences.size,
                     sentence = sentence,
                     pcm16le = withPause,
-                    sampleRateHz = SAMPLE_RATE
+                    sampleRateHz = sampleRate
                 )
             )
         }
@@ -77,16 +79,17 @@ class PiperTtsEngine @Inject constructor(
 
     private fun resolveModelPath(assetPath: String?): String? {
         if (assetPath.isNullOrBlank()) return null
+        if (!assetPath.endsWith(".onnx", ignoreCase = true)) return null
         val external = File(context.filesDir, assetPath)
-        if (external.exists()) return external.absolutePath
+        if (external.exists() && external.length() > 1024) return external.absolutePath
         return runCatching {
             context.assets.open(assetPath).use { input ->
                 val out = File(context.filesDir, assetPath)
                 out.parentFile?.mkdirs()
-                if (!out.exists()) {
+                if (!out.exists() || out.length() < 1024) {
                     out.outputStream().use { output -> input.copyTo(output) }
                 }
-                out.absolutePath
+                if (out.exists() && out.length() > 1024) out.absolutePath else null
             }
         }.getOrNull()
     }
@@ -100,8 +103,6 @@ class PiperTtsEngine @Inject constructor(
         val session = sessionCache.getOrPut(modelPath) {
             ortEnv.createSession(modelPath, OrtSession.SessionOptions())
         }
-        // Placeholder input — replaced when phonemizer + Piper config JSON are wired.
-        // Until then, prefer DemoToneSynthesizer via the catch path if shapes mismatch.
         val inputName = session.inputNames.first()
         val tokens = FloatArray(sentence.length.coerceAtLeast(1)) { i ->
             (sentence.getOrElse(i) { ' ' }.code % 256) / 255f
@@ -113,7 +114,7 @@ class PiperTtsEngine @Inject constructor(
                 return when (output) {
                     is Array<*> -> flattenFloatAudio(output)
                     is FloatArray -> floatToPcm16(output)
-                    else -> DemoToneSynthesizer.synthesize(sentence, SAMPLE_RATE)
+                    else -> error("Unsupported Piper output type")
                 }
             }
         }
@@ -143,29 +144,5 @@ class PiperTtsEngine @Inject constructor(
 
     companion object {
         const val SAMPLE_RATE = 22_050
-    }
-}
-
-/**
- * Development fallback: generates soft tonal PCM proportional to sentence length
- * so queue + AudioTrack streaming can be verified without ONNX voice packs.
- */
-object DemoToneSynthesizer {
-    fun synthesize(sentence: String, sampleRate: Int): ShortArray {
-        val durationSec = (0.35 + sentence.length * 0.035).coerceIn(0.4, 4.0)
-        val totalSamples = (durationSec * sampleRate).toInt()
-        val baseFreq = 180.0 + (sentence.hashCode().and(0xFF) % 80)
-        return ShortArray(totalSamples) { i ->
-            val t = i.toDouble() / sampleRate
-            val envelope = when {
-                i < sampleRate * 0.02 -> i / (sampleRate * 0.02)
-                i > totalSamples - sampleRate * 0.05 ->
-                    ((totalSamples - i) / (sampleRate * 0.05)).coerceAtLeast(0.0)
-                else -> 1.0
-            }
-            val sample = 0.18 * sin(2.0 * PI * baseFreq * t) *
-                (0.6 + 0.4 * sin(2.0 * PI * 3.0 * t))
-            (sample * envelope * Short.MAX_VALUE).toInt().toShort()
-        }
     }
 }
