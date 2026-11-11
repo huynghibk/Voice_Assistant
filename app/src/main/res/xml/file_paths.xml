@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Scoped storage regions safe to share via content:// URIs -->
+    <cache-path name="cache" path="." />
+    <files-path name="files" path="." />
+    <files-path name="exports_internal" path="exports/" />
+    <files-path name="timeline_internal" path="timeline/" />
+    <files-path name="voice_samples" path="voice_samples/" />
+    <external-files-path name="external_files" path="." />
+    <external-files-path name="exports" path="exports/" />
+    <external-cache-path name="external_cache" path="." />
+</paths>
