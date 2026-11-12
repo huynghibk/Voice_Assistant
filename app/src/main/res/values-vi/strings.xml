@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VoiceAssistant</string>
+    <string name="brand_tagline">Nghe · Clone · Xuất audio</string>
+
+    <string name="nav_tts">TTS</string>
+    <string name="nav_translate">Dịch</string>
+    <string name="nav_search">Tìm kiếm</string>
+    <string name="nav_projects">Dự án</string>
+    <string name="nav_voices">Giọng</string>
+    <string name="nav_studio">Studio</string>
+    <string name="nav_settings">Cài đặt</string>
+
+    <string name="studio_subtitle">Gộp dự án và timeline audio</string>
+    <string name="studio_tab_projects">Dự án</string>
+    <string name="studio_tab_timeline">Timeline</string>
+
+    <string name="translate_subtitle">Dịch văn bản hoặc quét bằng camera</string>
+    <string name="translate_hint">Nhập hoặc dán văn bản cần dịch…</string>
+
+    <string name="conversation_open">Hội thoại</string>
+    <string name="conversation_close">Đóng</string>
+    <string name="conversation_swap">Đảo chiều ngôn ngữ</string>
+    <string name="conversation_auto_speak">Tự động đọc loa</string>
+    <string name="conversation_mic">Nói</string>
+    <string name="conversation_stop_mic">Dừng</string>
+    <string name="conversation_my_hint">Bấm micro và nói…</string>
+    <string name="conversation_their_hint">Bản dịch hiện ở đây…</string>
+
+    <string name="home_subtitle">Dán, ghi âm hoặc nghe ngay</string>
+    <string name="home_voices">Giọng đọc</string>
+    <string name="home_voice_preset">Có sẵn</string>
+    <string name="home_voice_saved">Đã lưu</string>
+    <string name="home_text_hint">Nhập, dán hoặc bấm Ghi âm để nói…</string>
+    <string name="home_export">Xuất bản</string>
+    <string name="home_play">Phát</string>
+    <string name="home_stop">Dừng</string>
+    <string name="home_share">Chia sẻ</string>
+    <string name="home_route_speaker">Loa máy</string>
+    <string name="home_record">Ghi âm → Văn bản</string>
+    <string name="home_stop_record">Dừng ghi âm</string>
+    <string name="home_translate">Dịch</string>
+    <string name="home_translating">Đang dịch…</string>
+    <string name="home_translate_section">Dịch thuật</string>
+    <string name="home_source_lang">Từ</string>
+    <string name="home_target_lang">Sang</string>
+    <string name="home_scan_camera">Quét</string>
+    <string name="camera_title">Quét &amp; Dịch</string>
+    <string name="camera_capture">Chụp &amp; Dịch nhanh</string>
+    <string name="camera_send_tts">Đưa vào bộ đọc TTS</string>
+    <string name="camera_permission">Cần quyền camera để quét chữ.</string>
+    <string name="camera_grant">Cấp quyền camera</string>
+    <string name="camera_processing">Đang đọc chữ…</string>
+    <string name="camera_back">Quay lại</string>
+
+    <string name="settings_title">Cài đặt &amp; Trợ giúp</string>
+    <string name="settings_section">Cài đặt</string>
+    <string name="settings_help_section">Trợ giúp</string>
+    <string name="settings_language">Ngôn ngữ</string>
+    <string name="settings_language_subtitle">Chọn ngôn ngữ giao diện ứng dụng</string>
+    <string name="settings_voice">Giọng đọc</string>
+    <string name="settings_voice_subtitle">Chọn giọng ở tab Giọng. Chưa có model Piper thì app dùng giọng hệ thống.</string>
+    <string name="settings_export">Xuất audio</string>
+    <string name="settings_export_subtitle">Định dạng xuất (WAV/MP3…) chọn trên màn hình TTS trước khi bấm Xuất.</string>
+    <string name="settings_manual">Sách hướng dẫn</string>
+    <string name="settings_manual_subtitle">Đọc hướng dẫn đầy đủ như đọc sách</string>
+    <string name="settings_help">Mẹo nhanh</string>
+    <string name="settings_help_subtitle">Cách dán văn bản, phát và xuất file</string>
+    <string name="manual_title">Sách hướng dẫn</string>
+    <string name="manual_cover_subtitle">Hướng dẫn đầy đủ VoiceAssistant — tính năng, luồng dùng và từng tab.</string>
+    <string name="manual_chapter_count">%1$d chương</string>
+    <string name="manual_start_reading">Bắt đầu đọc</string>
+    <string name="manual_open_toc">Mục lục</string>
+    <string name="manual_toc">Mục lục</string>
+    <string name="manual_toc_hint">Chọn chương. Đọc thong thả — như lật từng trang sách.</string>
+    <string name="manual_page_progress">Chương %1$d / %2$d</string>
+    <string name="manual_prev">Trước</string>
+    <string name="manual_next">Sau</string>
+    <string name="manual_empty">Không có chương nào.</string>
+    <string name="settings_about">Giới thiệu</string>
+    <string name="settings_about_version">Phiên bản %1$s</string>
+    <string name="settings_about_body">VoiceAssistant giúp bạn nghe và xuất audio từ văn bản ngay trên máy, không cần gửi nội dung lên máy chủ.</string>
+    <string name="settings_help_1">1. Mở tab TTS, dán hoặc gõ văn bản cần đọc.</string>
+    <string name="settings_help_2">2. Chọn giọng ở hàng Giọng đọc (hoặc clone giọng ở tab Giọng).</string>
+    <string name="settings_help_3">3. Bấm Phát để nghe. Bấm Dừng nếu muốn ngắt giữa chừng.</string>
+    <string name="settings_help_4">4. Chọn định dạng xuất rồi bấm Xuất / Chia sẻ khi cần lưu file.</string>
+    <string name="settings_help_5">5. Văn bản dài: dùng tab Dự án để lưu và chỉnh sửa theo dự án.</string>
+</resources>

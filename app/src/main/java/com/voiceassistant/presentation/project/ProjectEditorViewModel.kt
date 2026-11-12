@@ -1,5 +1,6 @@
 package com.voiceassistant.presentation.project
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -10,16 +11,17 @@ import com.voiceassistant.data.translation.OfflineTranslationService
 import com.voiceassistant.domain.model.ProjectStatus
 import com.voiceassistant.domain.model.TextProject
 import com.voiceassistant.domain.model.VoiceModel
+import com.voiceassistant.domain.playback.PlaybackController
 import com.voiceassistant.domain.repository.ProjectRepository
 import com.voiceassistant.domain.repository.VoiceRepository
-import com.voiceassistant.domain.usecase.SynthesizeSpeechUseCase
 import com.voiceassistant.engine.audio.AudioExportEngine
 import com.voiceassistant.engine.audio.ExportFormat
 import com.voiceassistant.engine.audio.ExportQuality
+import com.voiceassistant.engine.playback.TtsPlaybackStarter
 import com.voiceassistant.engine.share.ShareEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,15 +45,19 @@ data class ProjectEditorUiState(
     val exportFormat: ExportFormat = ExportFormat.WAV,
     val exportQuality: ExportQuality = ExportQuality.STUDIO,
     val lastExportPath: String? = null,
-    val busy: Boolean = false
+    val busy: Boolean = false,
+    val playbackSpeed: Float = 1.0f,
+    val karaokeSentences: List<String> = emptyList(),
+    val karaokeIndex: Int = -1
 )
 
 @HiltViewModel
 class ProjectEditorViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     savedStateHandle: SavedStateHandle,
     private val projectRepository: ProjectRepository,
     private val voiceRepository: VoiceRepository,
-    private val synthesizeSpeechUseCase: SynthesizeSpeechUseCase,
+    private val playbackController: PlaybackController,
     private val documentImporter: DocumentImporter,
     private val translationService: OfflineTranslationService,
     private val audioExportEngine: AudioExportEngine,
@@ -66,9 +72,9 @@ class ProjectEditorViewModel @Inject constructor(
     )
     val uiState: StateFlow<ProjectEditorUiState> = _uiState.asStateFlow()
 
-    private var playJob: Job? = null
     private var lastPcm: ShortArray = shortArrayOf()
     private var lastSampleRate: Int = 22_050
+    val speedPresets: List<Float> = listOf(0.8f, 1.0f, 1.2f, 1.5f, 2.0f)
 
     init {
         viewModelScope.launch {
@@ -89,6 +95,23 @@ class ProjectEditorViewModel @Inject constructor(
                     ?: list.firstOrNull { it.isDefault }?.id
                     ?: list.firstOrNull()?.id
                 _uiState.update { it.copy(voices = list, selectedVoiceId = selected) }
+            }
+        }
+        viewModelScope.launch {
+            playbackController.state.collect { playback ->
+                if (playback.isPlaying) {
+                    lastPcm = playbackController.getCollectedPcm()
+                    lastSampleRate = playbackController.getSampleRate()
+                }
+                _uiState.update {
+                    it.copy(
+                        isPlaying = playback.isPlaying,
+                        playbackSpeed = playback.speed,
+                        karaokeSentences = playback.sentences,
+                        karaokeIndex = playback.currentSentenceIndex,
+                        statusMessage = playback.statusMessage.ifBlank { it.statusMessage }
+                    )
+                }
             }
         }
     }
@@ -177,35 +200,22 @@ class ProjectEditorViewModel @Inject constructor(
             return
         }
         val voice = state.voices.firstOrNull { it.id == state.selectedVoiceId } ?: return
-        playJob?.cancel()
-        playJob = viewModelScope.launch {
-            _uiState.update { it.copy(isPlaying = true, statusMessage = "Đang đọc…") }
-            try {
-                synthesizeSpeechUseCase.execute(text, voice).collect { progress ->
-                    lastPcm = progress.collectedPcm
-                    lastSampleRate = progress.chunk.sampleRateHz
-                    _uiState.update {
-                        it.copy(
-                            statusMessage = "Câu ${progress.chunk.sentenceIndex + 1}/${progress.chunk.sentenceCount}"
-                        )
-                    }
-                }
-                _uiState.update { it.copy(isPlaying = false, statusMessage = "Hoàn tất.") }
-            } catch (e: Exception) {
-                synthesizeSpeechUseCase.stop()
-                _uiState.update {
-                    it.copy(isPlaying = false, statusMessage = e.message ?: "Đã dừng.")
-                }
-            }
-        }
+        if (state.isPlaying) stop()
+        playbackController.setSpeed(state.playbackSpeed)
+        playbackController.start(text, voice, title = state.title.ifBlank { "Studio" })
+        TtsPlaybackStarter.start(appContext)
     }
 
     fun stop() {
-        playJob?.cancel()
-        viewModelScope.launch {
-            synthesizeSpeechUseCase.stop()
-            _uiState.update { it.copy(isPlaying = false, statusMessage = "Đã dừng.") }
-        }
+        playbackController.stop()
+        lastPcm = playbackController.getCollectedPcm()
+        lastSampleRate = playbackController.getSampleRate()
+        TtsPlaybackStarter.stop(appContext)
+    }
+
+    fun setSpeed(speed: Float) {
+        playbackController.setSpeed(speed)
+        _uiState.update { it.copy(playbackSpeed = speed) }
     }
 
     fun exportAudio() {

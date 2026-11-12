@@ -53,6 +53,7 @@ import kotlin.math.max
 @Composable
 fun TimelineScreen(
     @Suppress("UNUSED_PARAMETER") onBack: () -> Unit = {},
+    embedded: Boolean = false,
     viewModel: TimelineViewModel = hiltViewModel()
 ) {
     val project by viewModel.project.collectAsStateWithLifecycle()
@@ -71,21 +72,23 @@ fun TimelineScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Studio Timeline", style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            "AudioClip → một filtergraph khi Render",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
+            if (!embedded) {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text("Studio Timeline", style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                "AudioClip → một filtergraph khi Render",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    )
                 )
-            )
+            }
         }
     ) { padding ->
         Column(

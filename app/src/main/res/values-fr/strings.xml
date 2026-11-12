@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VoiceAssistant</string>
+    <string name="brand_tagline">Écouter · Cloner · Exporter</string>
+
+    <string name="nav_tts">TTS</string>
+    <string name="nav_search">Recherche</string>
+    <string name="nav_projects">Projets</string>
+    <string name="nav_voices">Voix</string>
+    <string name="nav_studio">Studio</string>
+    <string name="nav_settings">Réglages</string>
+
+    <string name="home_subtitle">Collez du texte et écoutez aussitôt</string>
+    <string name="home_voices">Voix de lecture</string>
+    <string name="home_voice_preset">Intégrée</string>
+    <string name="home_voice_saved">Enregistrée</string>
+    <string name="home_text_hint">Saisissez ou collez le texte à lire…</string>
+    <string name="home_export">Exporter</string>
+    <string name="home_play">Lecture</string>
+    <string name="home_stop">Arrêt</string>
+    <string name="home_share">Partager</string>
+    <string name="home_route_speaker">Haut-parleur</string>
+
+    <string name="settings_title">Réglages et aide</string>
+    <string name="settings_section">Réglages</string>
+    <string name="settings_help_section">Aide</string>
+    <string name="settings_language">Langue</string>
+    <string name="settings_language_subtitle">Choisir la langue de l’interface</string>
+    <string name="settings_voice">Voix de lecture</string>
+    <string name="settings_voice_subtitle">Choisissez une voix dans Voix. Le TTS système est utilisé sans modèles Piper.</string>
+    <string name="settings_export">Export audio</string>
+    <string name="settings_export_subtitle">Choisissez le format (WAV/MP3…) sur l’écran TTS avant d’exporter.</string>
+    <string name="settings_help">Mode d’emploi</string>
+    <string name="settings_help_subtitle">Coller, lire et exporter des fichiers</string>
+    <string name="settings_about">À propos</string>
+    <string name="settings_about_version">Version %1$s</string>
+    <string name="settings_about_body">VoiceAssistant lit et exporte l’audio depuis du texte sur l’appareil, sans envoyer votre contenu vers un serveur.</string>
+    <string name="settings_help_1">1. Ouvrez TTS, collez ou saisissez le texte à lire.</string>
+    <string name="settings_help_2">2. Choisissez une voix (ou clonez-en une dans Voix).</string>
+    <string name="settings_help_3">3. Appuyez sur Lecture. Arrêtez à tout moment.</string>
+    <string name="settings_help_4">4. Choisissez un format, puis Exporter / Partager.</string>
+    <string name="settings_help_5">5. Pour les longs textes, enregistrez dans Projets.</string>
+</resources>

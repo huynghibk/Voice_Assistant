@@ -37,6 +37,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.voiceassistant.engine.audio.ExportFormat
 import com.voiceassistant.engine.audio.ExportQuality
+import com.voiceassistant.presentation.components.KaraokeTextPanel
 import com.voiceassistant.presentation.components.VaGhostButton
 import com.voiceassistant.presentation.components.VaPrimaryButton
 import com.voiceassistant.presentation.components.VaSectionLabel
@@ -106,16 +107,27 @@ fun ProjectEditorScreen(
             }
 
             Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = state.content,
-                onValueChange = viewModel::onContentChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp),
-                placeholder = { Text("Nội dung văn bản…") },
-                shape = MaterialTheme.shapes.large,
-                colors = fieldColors(extras.hairline)
-            )
+            if (state.isPlaying && state.karaokeSentences.isNotEmpty()) {
+                VaSectionLabel("Đang đọc")
+                KaraokeTextPanel(
+                    sentences = state.karaokeSentences,
+                    activeIndex = state.karaokeIndex,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp)
+                )
+            } else {
+                OutlinedTextField(
+                    value = state.content,
+                    onValueChange = viewModel::onContentChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp),
+                    placeholder = { Text("Nội dung văn bản…") },
+                    shape = MaterialTheme.shapes.large,
+                    colors = fieldColors(extras.hairline)
+                )
+            }
 
             Spacer(Modifier.height(12.dp))
             Row(
@@ -159,8 +171,8 @@ fun ProjectEditorScreen(
                 state.languages.forEach { lang ->
                     VaVoiceChip(
                         label = "Từ ${lang.label}",
-                        selected = state.sourceLang == lang.code,
-                        onClick = { viewModel.onSourceLang(lang.code) }
+                        selected = state.sourceLang == lang.id,
+                        onClick = { viewModel.onSourceLang(lang.id) }
                     )
                 }
             }
@@ -172,8 +184,8 @@ fun ProjectEditorScreen(
                 state.languages.forEach { lang ->
                     VaVoiceChip(
                         label = "Sang ${lang.label}",
-                        selected = state.targetLang == lang.code,
-                        onClick = { viewModel.onTargetLang(lang.code) }
+                        selected = state.targetLang == lang.id,
+                        onClick = { viewModel.onTargetLang(lang.id) }
                     )
                 }
             }
@@ -199,6 +211,22 @@ fun ProjectEditorScreen(
                         label = q.name,
                         selected = state.exportQuality == q,
                         onClick = { viewModel.onExportQuality(q) }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            VaSectionLabel("Tốc độ")
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(VaDimens.chipGap)
+            ) {
+                viewModel.speedPresets.forEach { speed ->
+                    val label = if (speed == 1.0f) "1.0x" else "${speed}x"
+                    VaVoiceChip(
+                        label = label,
+                        selected = state.playbackSpeed == speed,
+                        onClick = { viewModel.setSpeed(speed) }
                     )
                 }
             }

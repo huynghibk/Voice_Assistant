@@ -38,43 +38,66 @@ class PiperTtsEngine @Inject constructor(
     private val ortEnv: OrtEnvironment by lazy { OrtEnvironment.getEnvironment() }
     private val sessionCache = mutableMapOf<String, OrtSession>()
 
-    override fun synthesizeStreaming(text: String, voice: VoiceModel): Flow<PcmChunk> = flow {
+    override fun synthesizeStreaming(text: String, voice: VoiceModel): Flow<PcmChunk> =
+        synthesizeStreaming(text, voice, speechRate = 1.0f)
+
+    fun synthesizeStreaming(
+        text: String,
+        voice: VoiceModel,
+        speechRate: Float
+    ): Flow<PcmChunk> = flow {
         cancelled.set(false)
         val sentences = textSplitter.split(text)
         if (sentences.isEmpty()) return@flow
-
-        val modelPath = resolveModelPath(voice.modelAssetPath)
-        val useOnnx = modelPath != null
-        val localeHint = AndroidSystemTtsSynthesizer.localeForVoiceId(voice.id, voice.name)
 
         sentences.forEachIndexed { index, sentence ->
             if (cancelled.get() || !coroutineContext.isActive) {
                 throw CancellationException("TTS cancelled")
             }
-            val (pcm, sampleRate) = if (useOnnx) {
-                runCatching {
-                    inferWithOnnx(modelPath!!, sentence) to SAMPLE_RATE
-                }.getOrElse {
-                    androidSystemTtsSynthesizer.synthesize(sentence, localeHint)
-                }
-            } else {
-                androidSystemTtsSynthesizer.synthesize(sentence, localeHint)
-            }
-            val withPause = appendSilence(pcm, (sampleRate * 0.25).toInt())
-            emit(
-                PcmChunk(
-                    sentenceIndex = index,
-                    sentenceCount = sentences.size,
-                    sentence = sentence,
-                    pcm16le = withPause,
-                    sampleRateHz = sampleRate
-                )
-            )
+            emit(synthesizeSentence(sentence, voice, index, sentences.size, speechRate))
         }
     }.flowOn(Dispatchers.Default)
 
+    /**
+     * Synthesize a single sentence. Used by [com.voiceassistant.engine.playback.LocalPlaybackController]
+     * for skip/resume from an arbitrary sentence index.
+     */
+    suspend fun synthesizeSentence(
+        sentence: String,
+        voice: VoiceModel,
+        sentenceIndex: Int,
+        sentenceCount: Int,
+        speechRate: Float = 1.0f
+    ): PcmChunk {
+        val modelPath = resolveModelPath(voice.modelAssetPath)
+        val useOnnx = modelPath != null
+        val localeHint = AndroidSystemTtsSynthesizer.localeForVoiceId(voice.id, voice.name)
+        // Speed is applied at AudioTrack (PlaybackParams) so Piper + System TTS share one path.
+        val (pcm, sampleRate) = if (useOnnx) {
+            runCatching {
+                inferWithOnnx(modelPath!!, sentence) to SAMPLE_RATE
+            }.getOrElse {
+                androidSystemTtsSynthesizer.synthesize(sentence, localeHint, speechRate = 1.0f)
+            }
+        } else {
+            androidSystemTtsSynthesizer.synthesize(sentence, localeHint, speechRate = 1.0f)
+        }
+        val withPause = appendSilence(pcm, (sampleRate * 0.25).toInt())
+        return PcmChunk(
+            sentenceIndex = sentenceIndex,
+            sentenceCount = sentenceCount,
+            sentence = sentence,
+            pcm16le = withPause,
+            sampleRateHz = sampleRate
+        )
+    }
+
     override fun cancel() {
         cancelled.set(true)
+    }
+
+    fun clearCancel() {
+        cancelled.set(false)
     }
 
     private fun resolveModelPath(assetPath: String?): String? {

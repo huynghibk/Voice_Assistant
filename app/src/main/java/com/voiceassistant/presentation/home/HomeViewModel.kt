@@ -1,24 +1,35 @@
 package com.voiceassistant.presentation.home
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.voiceassistant.data.prefs.OnboardingPreferences
 import com.voiceassistant.domain.model.VoiceModel
+import com.voiceassistant.domain.playback.PlaybackController
 import com.voiceassistant.domain.repository.VoiceRepository
-import com.voiceassistant.domain.usecase.SynthesizeSpeechUseCase
+import com.voiceassistant.domain.resource.ResourcePackManager
+import com.voiceassistant.domain.resource.TtsResourceGuard
 import com.voiceassistant.engine.audio.AudioExportEngine
 import com.voiceassistant.engine.audio.AudioRoutingManager
 import com.voiceassistant.engine.audio.ExportFormat
 import com.voiceassistant.engine.audio.ExportQuality
 import com.voiceassistant.engine.audio.PcmStreamPlayer
+import com.voiceassistant.engine.playback.TtsPlaybackStarter
 import com.voiceassistant.engine.share.ShareEngine
+import com.voiceassistant.engine.stt.SpeechEvent
+import com.voiceassistant.engine.stt.SpeechToTextEngine
+import com.voiceassistant.engine.tts.AndroidSystemTtsSynthesizer
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.Locale
 import javax.inject.Inject
 
 data class HomeUiState(
@@ -26,34 +37,56 @@ data class HomeUiState(
     val voices: List<VoiceModel> = emptyList(),
     val selectedVoiceId: String? = null,
     val isPlaying: Boolean = false,
+    val isPaused: Boolean = false,
+    val isListening: Boolean = false,
     val progressLabel: String = "",
     val statusMessage: String = "",
     val lastExportPath: String? = null,
     val exportFormat: ExportFormat = ExportFormat.WAV,
     val exportQuality: ExportQuality = ExportQuality.COMPACT,
-    val routeLabel: String = "Loa máy",
-    val bufferMultiplier: Int = 2
+    val routeLabel: String = "",
+    val bufferMultiplier: Int = 2,
+    val showSystemTtsDialog: Boolean = false,
+    val showOnboarding: Boolean = false,
+    val onboardingPiperReady: Boolean = false,
+    val onboardingMlKitReady: Boolean = false,
+    val onboardingDownloading: Boolean = false,
+    val playbackSpeed: Float = 1.0f,
+    val karaokeSentences: List<String> = emptyList(),
+    val karaokeIndex: Int = -1
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val voiceRepository: VoiceRepository,
-    private val synthesizeSpeechUseCase: SynthesizeSpeechUseCase,
+    private val playbackController: PlaybackController,
     private val audioExportEngine: AudioExportEngine,
     private val shareEngine: ShareEngine,
     private val audioRoutingManager: AudioRoutingManager,
-    private val pcmStreamPlayer: PcmStreamPlayer
+    private val pcmStreamPlayer: PcmStreamPlayer,
+    private val androidSystemTtsSynthesizer: AndroidSystemTtsSynthesizer,
+    private val speechToTextEngine: SpeechToTextEngine,
+    private val ttsResourceGuard: TtsResourceGuard,
+    private val resourcePackManager: ResourcePackManager,
+    private val onboardingPreferences: OnboardingPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    private var playJob: Job? = null
+    private var listenJob: Job? = null
     private var lastPcm: ShortArray = shortArrayOf()
     private var lastSampleRate: Int = 22_050
     private var lastExportFile: File? = null
+    private var textBeforeListen: String = ""
+
+    val speedPresets: List<Float> = listOf(0.8f, 1.0f, 1.2f, 1.5f, 2.0f)
 
     init {
+        viewModelScope.launch {
+            runCatching { androidSystemTtsSynthesizer.warmUp() }
+        }
         viewModelScope.launch {
             voiceRepository.seedPresetsIfEmpty()
             voiceRepository.observeVoices().collect { voices ->
@@ -71,7 +104,6 @@ class HomeViewModel @Inject constructor(
                         bufferMultiplier = route.bufferMultiplier
                     )
                 }
-                // Rebuild AudioTrack buffer when Bluetooth/Cast connects mid-session
                 runCatching { pcmStreamPlayer.invalidateRoute() }
             }
         }
@@ -81,10 +113,99 @@ class HomeViewModel @Inject constructor(
                 _uiState.update { it.copy(statusMessage = "Đã dừng — tai nghe bị ngắt kết nối.") }
             }
         }
+        viewModelScope.launch {
+            playbackController.state.collect { playback ->
+                if (playback.isPlaying) {
+                    lastPcm = playbackController.getCollectedPcm()
+                    lastSampleRate = playbackController.getSampleRate()
+                }
+                val idx = playback.currentSentenceIndex
+                _uiState.update {
+                    it.copy(
+                        isPlaying = playback.isPlaying,
+                        isPaused = playback.isPaused,
+                        playbackSpeed = playback.speed,
+                        karaokeSentences = playback.sentences,
+                        karaokeIndex = idx,
+                        progressLabel = if (playback.isPlaying && idx >= 0) {
+                            "Câu ${idx + 1} / ${playback.sentenceCount}"
+                        } else {
+                            ""
+                        },
+                        statusMessage = playback.statusMessage.ifBlank { it.statusMessage }
+                    )
+                }
+            }
+        }
+        viewModelScope.launch { maybeShowOnboarding() }
+    }
+
+    private suspend fun maybeShowOnboarding() {
+        val done = onboardingPreferences.setupDone.first()
+        if (done) return
+        val piperReady = resourcePackManager.anyPiperReady()
+        val mlKitReady = resourcePackManager.isMlKitPairReady("en", "vi")
+        if (!piperReady || !mlKitReady) {
+            _uiState.update {
+                it.copy(
+                    showOnboarding = true,
+                    onboardingPiperReady = piperReady,
+                    onboardingMlKitReady = mlKitReady
+                )
+            }
+        } else {
+            onboardingPreferences.setSetupDone(true)
+        }
+    }
+
+    fun dismissOnboarding() {
+        viewModelScope.launch {
+            onboardingPreferences.setSetupDone(true)
+            _uiState.update { it.copy(showOnboarding = false) }
+        }
+    }
+
+    fun downloadStarterMlKit() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(onboardingDownloading = true) }
+            runCatching {
+                resourcePackManager.downloadMlKitLanguage("en", requireWifi = true)
+                resourcePackManager.downloadMlKitLanguage("vi", requireWifi = true)
+            }.onSuccess {
+                _uiState.update {
+                    it.copy(
+                        onboardingDownloading = false,
+                        onboardingMlKitReady = true,
+                        statusMessage = "Đã tải gói dịch EN–VI."
+                    )
+                }
+            }.onFailure { e ->
+                _uiState.update {
+                    it.copy(
+                        onboardingDownloading = false,
+                        statusMessage = e.message ?: "Tải gói dịch thất bại. Thử lại qua Wi‑Fi."
+                    )
+                }
+            }
+        }
+    }
+
+    fun dismissSystemTtsDialog() {
+        _uiState.update { it.copy(showSystemTtsDialog = false) }
     }
 
     fun onTextChange(value: String) {
         _uiState.update { it.copy(text = value) }
+    }
+
+    fun applyIncomingText(value: String) {
+        if (value.isBlank()) return
+        _uiState.update {
+            it.copy(
+                text = value,
+                statusMessage = "Đã nhận văn bản — sẵn sàng Phát."
+            )
+        }
     }
 
     fun onVoiceSelected(id: String) {
@@ -99,58 +220,142 @@ class HomeViewModel @Inject constructor(
         _uiState.update { it.copy(exportQuality = quality) }
     }
 
+    fun toggleListening() {
+        if (_uiState.value.isListening) {
+            stopListening()
+        } else {
+            startListening()
+        }
+    }
+
+    fun startListening() {
+        if (_uiState.value.isPlaying) stop()
+        if (!speechToTextEngine.isAvailable()) {
+            _uiState.update {
+                it.copy(statusMessage = "Thiết bị không hỗ trợ nhận dạng giọng nói.")
+            }
+            return
+        }
+        listenJob?.cancel()
+        textBeforeListen = _uiState.value.text
+        _uiState.update {
+            it.copy(isListening = true, statusMessage = "Đang nghe… hãy nói.")
+        }
+        listenJob = viewModelScope.launch {
+            speechToTextEngine.listen(Locale.getDefault()).collect { event ->
+                when (event) {
+                    SpeechEvent.Ready,
+                    SpeechEvent.BeginningOfSpeech -> {
+                        _uiState.update { it.copy(statusMessage = "Đang nghe…") }
+                    }
+                    is SpeechEvent.Partial -> {
+                        val merged = mergeTranscript(textBeforeListen, event.text)
+                        _uiState.update {
+                            it.copy(text = merged, statusMessage = "Đang nghe…")
+                        }
+                    }
+                    is SpeechEvent.Final -> {
+                        val merged = mergeTranscript(textBeforeListen, event.text)
+                        _uiState.update {
+                            it.copy(
+                                text = merged,
+                                isListening = false,
+                                statusMessage = "Đã chuyển giọng nói thành văn bản."
+                            )
+                        }
+                    }
+                    is SpeechEvent.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                isListening = false,
+                                statusMessage = event.message
+                            )
+                        }
+                    }
+                    SpeechEvent.End -> {
+                        _uiState.update { state ->
+                            if (state.isListening) {
+                                state.copy(
+                                    isListening = false,
+                                    statusMessage = if (state.text != textBeforeListen) {
+                                        "Đã chuyển giọng nói thành văn bản."
+                                    } else {
+                                        state.statusMessage.ifBlank { "Đã dừng ghi âm." }
+                                    }
+                                )
+                            } else state
+                        }
+                    }
+                }
+            }
+            _uiState.update { it.copy(isListening = false) }
+        }
+    }
+
+    fun stopListening() {
+        listenJob?.cancel()
+        listenJob = null
+        _uiState.update {
+            it.copy(
+                isListening = false,
+                statusMessage = if (it.text != textBeforeListen) {
+                    "Đã chuyển giọng nói thành văn bản."
+                } else {
+                    "Đã dừng ghi âm."
+                }
+            )
+        }
+    }
+
+    private fun mergeTranscript(base: String, spoken: String): String {
+        val spokenTrim = spoken.trim()
+        if (spokenTrim.isEmpty()) return base
+        val baseTrim = base.trimEnd()
+        return if (baseTrim.isEmpty()) spokenTrim
+        else "$baseTrim $spokenTrim"
+    }
+
     fun play() {
         val state = _uiState.value
         val text = state.text.trim()
         if (text.isEmpty()) {
-            _uiState.update { it.copy(statusMessage = "Nhập văn bản để đọc.") }
+            _uiState.update { it.copy(statusMessage = "Nhập hoặc ghi âm văn bản để đọc.") }
             return
         }
         val voice = state.voices.firstOrNull { it.id == state.selectedVoiceId } ?: return
+        if (state.isListening) stopListening()
+        if (state.isPlaying) {
+            stop()
+        }
 
-        playJob?.cancel()
-        playJob = viewModelScope.launch {
+        viewModelScope.launch {
+            val advice = ttsResourceGuard.advisePlay(voice)
             _uiState.update {
-                it.copy(isPlaying = true, statusMessage = "Đang tổng hợp…", progressLabel = "")
+                it.copy(
+                    statusMessage = advice.message ?: "Đang tổng hợp…",
+                    showSystemTtsDialog = advice.suggestOpenModelManager
+                )
             }
-            try {
-                synthesizeSpeechUseCase.execute(text, voice).collect { progress ->
-                    lastPcm = progress.collectedPcm
-                    lastSampleRate = progress.chunk.sampleRateHz
-                    val idx = progress.chunk.sentenceIndex + 1
-                    val total = progress.chunk.sentenceCount
-                    _uiState.update {
-                        it.copy(
-                            progressLabel = "Câu $idx / $total",
-                            statusMessage = progress.chunk.sentence.take(80)
-                        )
-                    }
-                }
-                _uiState.update {
-                    it.copy(isPlaying = false, statusMessage = "Hoàn tất.", progressLabel = "")
-                }
-            } catch (e: Exception) {
-                synthesizeSpeechUseCase.stop()
-                _uiState.update {
-                    it.copy(
-                        isPlaying = false,
-                        statusMessage = e.message ?: "Đã dừng.",
-                        progressLabel = ""
-                    )
-                }
-            }
+            playbackController.setSpeed(state.playbackSpeed)
+            playbackController.start(text, voice, title = voice.name)
+            TtsPlaybackStarter.start(appContext)
         }
     }
 
     fun stop() {
-        playJob?.cancel()
-        viewModelScope.launch {
-            synthesizeSpeechUseCase.stop()
-            _uiState.update {
-                it.copy(isPlaying = false, statusMessage = "Đã dừng.", progressLabel = "")
-            }
-        }
+        playbackController.stop()
+        lastPcm = playbackController.getCollectedPcm()
+        lastSampleRate = playbackController.getSampleRate()
+        TtsPlaybackStarter.stop(appContext)
     }
+
+    fun setSpeed(speed: Float) {
+        playbackController.setSpeed(speed)
+        _uiState.update { it.copy(playbackSpeed = speed) }
+    }
+
+    fun skipNext() = playbackController.skipToNextSentence()
+    fun skipPrevious() = playbackController.skipToPreviousSentence()
 
     fun exportAudio() {
         if (lastPcm.isEmpty()) {
@@ -217,7 +422,8 @@ class HomeViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        playJob?.cancel()
+        listenJob?.cancel()
+        // Do not stop playback — background service owns it
         super.onCleared()
     }
 }

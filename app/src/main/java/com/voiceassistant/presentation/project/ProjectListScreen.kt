@@ -37,6 +37,7 @@ import java.util.Date
 fun ProjectListScreen(
     onOpenProject: (String) -> Unit,
     onCreateProject: () -> Unit,
+    embedded: Boolean = false,
     viewModel: ProjectListViewModel = hiltViewModel()
 ) {
     val projects by viewModel.projects.collectAsStateWithLifecycle()
@@ -59,15 +60,20 @@ fun ProjectListScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = VaDimens.screenHorizontal, vertical = VaDimens.screenTop)
+                .padding(
+                    horizontal = if (embedded) VaDimens.screenHorizontal else VaDimens.screenHorizontal,
+                    vertical = if (embedded) 8.dp else VaDimens.screenTop
+                )
         ) {
-            Text("Dự án", style = MaterialTheme.typography.displayMedium)
-            Text(
-                "Bản nháp văn bản · giọng · xuất bản",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(16.dp))
+            if (!embedded) {
+                Text("Dự án", style = MaterialTheme.typography.displayMedium)
+                Text(
+                    "Bản nháp văn bản · giọng · xuất bản",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(16.dp))
+            }
 
             if (projects.isEmpty()) {
                 VaEmptyState(

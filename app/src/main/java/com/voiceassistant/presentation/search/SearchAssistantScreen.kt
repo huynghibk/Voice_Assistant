@@ -35,6 +35,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.voiceassistant.presentation.components.VaGhostButton
 import com.voiceassistant.presentation.components.VaPrimaryButton
+import com.voiceassistant.presentation.components.VaScreenHeader
 import com.voiceassistant.presentation.components.VaVoiceChip
 import com.voiceassistant.presentation.theme.LocalVaExtra
 import com.voiceassistant.presentation.theme.VaDimens
@@ -42,7 +43,10 @@ import java.text.DateFormat
 import java.util.Date
 
 @Composable
-fun SearchAssistantScreen(viewModel: SearchViewModel = hiltViewModel()) {
+fun SearchAssistantScreen(
+    onOpenSettings: () -> Unit = {},
+    viewModel: SearchViewModel = hiltViewModel()
+) {
     val state by viewModel.ui.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
@@ -55,13 +59,17 @@ fun SearchAssistantScreen(viewModel: SearchViewModel = hiltViewModel()) {
             .imePadding()
             .padding(horizontal = VaDimens.screenHorizontal, vertical = VaDimens.screenTop)
     ) {
-        Text("AI Search", style = MaterialTheme.typography.displayMedium)
-        Text(
-            if (state.isOnline) "Web + dự án nội bộ · đọc kết quả bằng TTS"
-            else "Offline · FTS4 trong dự án của bạn",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        VaScreenHeader(onOpenSettings = onOpenSettings) {
+            Column {
+                Text("AI Search", style = MaterialTheme.typography.displayMedium)
+                Text(
+                    if (state.isOnline) "Web + dự án nội bộ · đọc kết quả bằng TTS"
+                    else "Offline · FTS4 trong dự án của bạn",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
         Spacer(Modifier.height(12.dp))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(VaDimens.chipGap)) {

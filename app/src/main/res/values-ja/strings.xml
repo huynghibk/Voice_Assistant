@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VoiceAssistant</string>
+    <string name="brand_tagline">聴く · クローン · 書き出し</string>
+
+    <string name="nav_tts">読み上げ</string>
+    <string name="nav_search">検索</string>
+    <string name="nav_projects">プロジェクト</string>
+    <string name="nav_voices">ボイス</string>
+    <string name="nav_studio">スタジオ</string>
+    <string name="nav_settings">設定</string>
+
+    <string name="home_subtitle">テキストを貼り付けてすぐ聞く</string>
+    <string name="home_voices">読み上げボイス</string>
+    <string name="home_voice_preset">内蔵</string>
+    <string name="home_voice_saved">保存済み</string>
+    <string name="home_text_hint">読み上げるテキストを入力または貼り付け…</string>
+    <string name="home_export">書き出し</string>
+    <string name="home_play">再生</string>
+    <string name="home_stop">停止</string>
+    <string name="home_share">共有</string>
+    <string name="home_route_speaker">端末スピーカー</string>
+
+    <string name="settings_title">設定とヘルプ</string>
+    <string name="settings_section">設定</string>
+    <string name="settings_help_section">ヘルプ</string>
+    <string name="settings_language">言語</string>
+    <string name="settings_language_subtitle">アプリの表示言語を選択</string>
+    <string name="settings_voice">読み上げボイス</string>
+    <string name="settings_voice_subtitle">「ボイス」で選択。Piper モデルがない場合はシステム音声を使用します。</string>
+    <string name="settings_export">音声の書き出し</string>
+    <string name="settings_export_subtitle">読み上げ画面で形式（WAV/MP3…）を選んでから書き出します。</string>
+    <string name="settings_help">使い方</string>
+    <string name="settings_help_subtitle">貼り付け・再生・ファイル書き出し</string>
+    <string name="settings_about">このアプリについて</string>
+    <string name="settings_about_version">バージョン %1$s</string>
+    <string name="settings_about_body">VoiceAssistant は端末上でテキストを読み上げ・書き出しでき、内容をサーバーへ送る必要はありません。</string>
+    <string name="settings_help_1">1. 「読み上げ」を開き、テキストを貼り付けまたは入力します。</string>
+    <string name="settings_help_2">2. ボイスを選びます（または「ボイス」でクローン）。</string>
+    <string name="settings_help_3">3. 再生をタップして聞き、いつでも停止できます。</string>
+    <string name="settings_help_4">4. 書き出し形式を選び、書き出し／共有します。</string>
+    <string name="settings_help_5">5. 長い文章は「プロジェクト」で保存・編集します。</string>
+</resources>

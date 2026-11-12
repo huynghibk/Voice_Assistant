@@ -13,6 +13,7 @@ import android.os.Looper
 import androidx.mediarouter.media.MediaControlIntent
 import androidx.mediarouter.media.MediaRouteSelector
 import androidx.mediarouter.media.MediaRouter
+import com.voiceassistant.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +35,7 @@ enum class AudioOutputKind {
 
 data class AudioRouteState(
     val kind: AudioOutputKind = AudioOutputKind.BUILTIN_SPEAKER,
-    val deviceName: String = "Loa máy",
+    val deviceName: String = "",
     /** Multiplier over AudioTrack min buffer — larger for Bluetooth A2DP latency (~100–200ms). */
     val bufferMultiplier: Int = 2,
     val castAvailable: Boolean = false,
@@ -192,7 +193,7 @@ class AudioRoutingManager @Inject constructor(
 
         return AudioRouteState(
             kind = AudioOutputKind.BUILTIN_SPEAKER,
-            deviceName = "Loa máy",
+            deviceName = context.getString(R.string.home_route_speaker),
             bufferMultiplier = 2,
             castAvailable = hasCastRoutes()
         )

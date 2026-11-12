@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VoiceAssistant</string>
+    <string name="brand_tagline">聽讀 · 克隆 · 匯出</string>
+
+    <string name="nav_tts">朗讀</string>
+    <string name="nav_search">搜尋</string>
+    <string name="nav_projects">專案</string>
+    <string name="nav_voices">音色</string>
+    <string name="nav_studio">工作室</string>
+    <string name="nav_settings">設定</string>
+
+    <string name="home_subtitle">貼上文字，立即收聽</string>
+    <string name="home_voices">朗讀音色</string>
+    <string name="home_voice_preset">內建</string>
+    <string name="home_voice_saved">已儲存</string>
+    <string name="home_text_hint">輸入或貼上要朗讀的文字…</string>
+    <string name="home_export">匯出</string>
+    <string name="home_play">播放</string>
+    <string name="home_stop">停止</string>
+    <string name="home_share">分享</string>
+    <string name="home_route_speaker">裝置喇叭</string>
+
+    <string name="settings_title">設定與說明</string>
+    <string name="settings_section">設定</string>
+    <string name="settings_help_section">說明</string>
+    <string name="settings_language">語言</string>
+    <string name="settings_language_subtitle">選擇應用程式介面語言</string>
+    <string name="settings_voice">朗讀音色</string>
+    <string name="settings_voice_subtitle">在「音色」中選擇。尚未安裝 Piper 模型時使用系統語音。</string>
+    <string name="settings_export">音訊匯出</string>
+    <string name="settings_export_subtitle">在朗讀頁選擇格式（WAV/MP3…）後再匯出。</string>
+    <string name="settings_help">使用指南</string>
+    <string name="settings_help_subtitle">貼上文字、播放與匯出檔案</string>
+    <string name="settings_about">關於</string>
+    <string name="settings_about_version">版本 %1$s</string>
+    <string name="settings_about_body">VoiceAssistant 可在裝置本機朗讀並匯出文字音訊，無需上傳內容。</string>
+    <string name="settings_help_1">1. 開啟「朗讀」，貼上或輸入文字。</string>
+    <string name="settings_help_2">2. 選擇音色（或在「音色」中克隆）。</string>
+    <string name="settings_help_3">3. 點播放收聽，可隨時停止。</string>
+    <string name="settings_help_4">4. 選擇匯出格式，然後匯出／分享。</string>
+    <string name="settings_help_5">5. 長文請在「專案」中儲存與編輯。</string>
+</resources>

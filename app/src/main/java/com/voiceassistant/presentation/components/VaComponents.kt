@@ -24,8 +24,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -36,8 +40,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.voiceassistant.R
 import com.voiceassistant.presentation.theme.LocalVaExtra
 import com.voiceassistant.presentation.theme.VaDimens
 
@@ -60,15 +66,45 @@ fun VaBrandMark(modifier: Modifier = Modifier) {
         Spacer(Modifier.width(10.dp))
         Column {
             Text(
-                "VoiceAssistant",
+                stringResource(R.string.app_name),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                "Listen · Clone · Export",
+                stringResource(R.string.brand_tagline),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+/**
+ * Shared hub header: brand or title on the left, optional trailing actions + Settings.
+ */
+@Composable
+fun VaScreenHeader(
+    modifier: Modifier = Modifier,
+    onOpenSettings: (() -> Unit)? = null,
+    trailing: @Composable (() -> Unit)? = null,
+    titleContent: @Composable () -> Unit
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.weight(1f)) {
+            titleContent()
+        }
+        trailing?.invoke()
+        if (onOpenSettings != null) {
+            IconButton(onClick = onOpenSettings) {
+                Icon(
+                    Icons.Outlined.Settings,
+                    contentDescription = stringResource(R.string.nav_settings),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

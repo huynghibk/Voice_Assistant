@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VoiceAssistant</string>
+    <string name="brand_tagline">听读 · 克隆 · 导出</string>
+
+    <string name="nav_tts">朗读</string>
+    <string name="nav_search">搜索</string>
+    <string name="nav_projects">项目</string>
+    <string name="nav_voices">音色</string>
+    <string name="nav_studio">工作室</string>
+    <string name="nav_settings">设置</string>
+
+    <string name="home_subtitle">粘贴文本，立即收听</string>
+    <string name="home_voices">朗读音色</string>
+    <string name="home_voice_preset">内置</string>
+    <string name="home_voice_saved">已保存</string>
+    <string name="home_text_hint">输入或粘贴要朗读的文本…</string>
+    <string name="home_export">导出</string>
+    <string name="home_play">播放</string>
+    <string name="home_stop">停止</string>
+    <string name="home_share">分享</string>
+    <string name="home_route_speaker">设备扬声器</string>
+
+    <string name="settings_title">设置与帮助</string>
+    <string name="settings_section">设置</string>
+    <string name="settings_help_section">帮助</string>
+    <string name="settings_language">语言</string>
+    <string name="settings_language_subtitle">选择应用界面语言</string>
+    <string name="settings_voice">朗读音色</string>
+    <string name="settings_voice_subtitle">在“音色”中选择。未安装 Piper 模型时使用系统语音。</string>
+    <string name="settings_export">音频导出</string>
+    <string name="settings_export_subtitle">在朗读页选择格式（WAV/MP3…）后再导出。</string>
+    <string name="settings_help">使用指南</string>
+    <string name="settings_help_subtitle">粘贴文本、播放与导出文件</string>
+    <string name="settings_about">关于</string>
+    <string name="settings_about_version">版本 %1$s</string>
+    <string name="settings_about_body">VoiceAssistant 可在设备本地朗读并导出文本音频，无需上传内容。</string>
+    <string name="settings_help_1">1. 打开“朗读”，粘贴或输入文本。</string>
+    <string name="settings_help_2">2. 选择音色（或在“音色”中克隆）。</string>
+    <string name="settings_help_3">3. 点击播放收听，可随时停止。</string>
+    <string name="settings_help_4">4. 选择导出格式，然后导出/分享。</string>
+    <string name="settings_help_5">5. 长文本请在“项目”中保存与编辑。</string>
+</resources>

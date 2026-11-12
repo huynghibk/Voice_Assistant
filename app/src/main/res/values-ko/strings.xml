@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VoiceAssistant</string>
+    <string name="brand_tagline">듣기 · 복제 · 내보내기</string>
+
+    <string name="nav_tts">읽기</string>
+    <string name="nav_search">검색</string>
+    <string name="nav_projects">프로젝트</string>
+    <string name="nav_voices">음성</string>
+    <string name="nav_studio">스튜디오</string>
+    <string name="nav_settings">설정</string>
+
+    <string name="home_subtitle">텍스트를 붙여넣고 바로 듣기</string>
+    <string name="home_voices">읽기 음성</string>
+    <string name="home_voice_preset">기본</string>
+    <string name="home_voice_saved">저장됨</string>
+    <string name="home_text_hint">읽을 텍스트를 입력하거나 붙여넣기…</string>
+    <string name="home_export">내보내기</string>
+    <string name="home_play">재생</string>
+    <string name="home_stop">중지</string>
+    <string name="home_share">공유</string>
+    <string name="home_route_speaker">기기 스피커</string>
+
+    <string name="settings_title">설정 및 도움말</string>
+    <string name="settings_section">설정</string>
+    <string name="settings_help_section">도움말</string>
+    <string name="settings_language">언어</string>
+    <string name="settings_language_subtitle">앱 인터페이스 언어 선택</string>
+    <string name="settings_voice">읽기 음성</string>
+    <string name="settings_voice_subtitle">‘음성’에서 선택하세요. Piper 모델이 없으면 시스템 TTS를 사용합니다.</string>
+    <string name="settings_export">오디오 내보내기</string>
+    <string name="settings_export_subtitle">읽기 화면에서 형식(WAV/MP3…)을 고른 뒤 내보내세요.</string>
+    <string name="settings_help">사용 방법</string>
+    <string name="settings_help_subtitle">붙여넣기, 재생, 파일 내보내기</string>
+    <string name="settings_about">정보</string>
+    <string name="settings_about_version">버전 %1$s</string>
+    <string name="settings_about_body">VoiceAssistant는 기기에서 텍스트를 읽고 오디오로 내보내며, 내용을 서버로 보내지 않습니다.</string>
+    <string name="settings_help_1">1. ‘읽기’를 열고 텍스트를 붙여넣거나 입력합니다.</string>
+    <string name="settings_help_2">2. 음성을 선택합니다(또는 ‘음성’에서 복제).</string>
+    <string name="settings_help_3">3. 재생을 눌러 듣고, 언제든 중지할 수 있습니다.</string>
+    <string name="settings_help_4">4. 내보내기 형식을 선택한 뒤 내보내기/공유합니다.</string>
+    <string name="settings_help_5">5. 긴 텍스트는 ‘프로젝트’에서 저장·편집하세요.</string>
+</resources>

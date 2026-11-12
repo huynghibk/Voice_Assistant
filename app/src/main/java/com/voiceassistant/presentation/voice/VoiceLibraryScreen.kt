@@ -26,6 +26,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.voiceassistant.presentation.components.VaEmptyState
 import com.voiceassistant.presentation.components.VaPrimaryButton
+import com.voiceassistant.presentation.components.VaScreenHeader
 import com.voiceassistant.presentation.components.VaTag
 import com.voiceassistant.presentation.theme.LocalVaExtra
 import com.voiceassistant.presentation.theme.VaDimens
@@ -33,6 +34,7 @@ import com.voiceassistant.presentation.theme.VaDimens
 @Composable
 fun VoiceLibraryScreen(
     onCloneVoice: () -> Unit,
+    onOpenSettings: () -> Unit = {},
     viewModel: VoiceLibraryViewModel = hiltViewModel()
 ) {
     val voices by viewModel.voices.collectAsStateWithLifecycle()
@@ -44,12 +46,16 @@ fun VoiceLibraryScreen(
             .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = VaDimens.screenHorizontal, vertical = VaDimens.screenTop)
     ) {
-        Text("Thư viện Giọng", style = MaterialTheme.typography.displayMedium)
-        Text(
-            "Preset Piper và giọng đã clone",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        VaScreenHeader(onOpenSettings = onOpenSettings) {
+            Column {
+                Text("Thư viện Giọng", style = MaterialTheme.typography.displayMedium)
+                Text(
+                    "Preset Piper và giọng đã clone",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
         Spacer(Modifier.height(16.dp))
         VaPrimaryButton(
             text = "Clone giọng mới",
