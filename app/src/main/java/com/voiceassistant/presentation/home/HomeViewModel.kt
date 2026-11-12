@@ -80,6 +80,7 @@ class HomeViewModel @Inject constructor(
     private var lastSampleRate: Int = 22_050
     private var lastExportFile: File? = null
     private var textBeforeListen: String = ""
+    private var lastSeenDefaultVoiceId: String? = null
 
     val speedPresets: List<Float> = listOf(0.8f, 1.0f, 1.2f, 1.5f, 2.0f)
 
@@ -90,9 +91,19 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             voiceRepository.seedPresetsIfEmpty()
             voiceRepository.observeVoices().collect { voices ->
-                val selected = _uiState.value.selectedVoiceId
-                    ?: voices.firstOrNull { it.isDefault }?.id
-                    ?: voices.firstOrNull()?.id
+                val current = _uiState.value.selectedVoiceId
+                val defaultId = voices.firstOrNull { it.isDefault }?.id
+                val defaultChanged =
+                    defaultId != null &&
+                        lastSeenDefaultVoiceId != null &&
+                        defaultId != lastSeenDefaultVoiceId
+                if (defaultId != null) lastSeenDefaultVoiceId = defaultId
+                // After Piper download setDefault(...), switch to that voice for ONNX playback.
+                val selected = when {
+                    defaultChanged -> defaultId
+                    current != null && voices.any { it.id == current } -> current
+                    else -> defaultId ?: voices.firstOrNull()?.id
+                }
                 _uiState.update { it.copy(voices = voices, selectedVoiceId = selected) }
             }
         }
@@ -190,8 +201,13 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun dismissSystemTtsDialog() {
+    fun dismissSystemTtsDialog(dontShowAgain: Boolean = false) {
         _uiState.update { it.copy(showSystemTtsDialog = false) }
+        if (dontShowAgain) {
+            viewModelScope.launch {
+                onboardingPreferences.setSuppressSystemTtsDialog(true)
+            }
+        }
     }
 
     fun onTextChange(value: String) {
@@ -330,12 +346,15 @@ class HomeViewModel @Inject constructor(
 
         viewModelScope.launch {
             val advice = ttsResourceGuard.advisePlay(voice)
+            val suppress = onboardingPreferences.suppressSystemTtsDialog.first()
             _uiState.update {
                 it.copy(
                     statusMessage = advice.message ?: "Đang tổng hợp…",
-                    showSystemTtsDialog = advice.suggestOpenModelManager
+                    showSystemTtsDialog = if (suppress) false else advice.suggestOpenModelManager
                 )
             }
+            // Clear STT/SCO earpiece routing before TTS media playback.
+            audioRoutingManager.ensureMediaMode()
             playbackController.setSpeed(state.playbackSpeed)
             playbackController.start(text, voice, title = voice.name)
             TtsPlaybackStarter.start(appContext)

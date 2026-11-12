@@ -105,9 +105,26 @@ class AudioRoutingManager @Inject constructor(
                 MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY
             )
         }
-        // Prefer media stream for A2DP when Bluetooth is connected
-        runCatching { audioManager.mode = AudioManager.MODE_NORMAL }
+        // Prefer media stream for A2DP when Bluetooth is connected; never leave call/SCO mode.
+        ensureMediaMode()
         refresh()
+    }
+
+    /** Call before TTS playback so output stays on speaker / BT A2DP / headset. */
+    fun ensureMediaMode() {
+        runCatching {
+            if (audioManager.mode != AudioManager.MODE_NORMAL) {
+                audioManager.mode = AudioManager.MODE_NORMAL
+            }
+            if (audioManager.isBluetoothScoOn) {
+                audioManager.stopBluetoothSco()
+                @Suppress("DEPRECATION")
+                audioManager.isBluetoothScoOn = false
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                audioManager.clearCommunicationDevice()
+            }
+        }
     }
 
     fun stop() {

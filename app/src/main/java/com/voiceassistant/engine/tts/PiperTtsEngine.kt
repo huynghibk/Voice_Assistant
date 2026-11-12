@@ -104,13 +104,25 @@ class PiperTtsEngine @Inject constructor(
         if (assetPath.isNullOrBlank()) return null
         if (!assetPath.endsWith(".onnx", ignoreCase = true)) return null
         val external = File(context.filesDir, assetPath)
-        if (external.exists() && external.length() > 1024) return external.absolutePath
+        val config = File(context.filesDir, "$assetPath.json")
+        // Prefer filesDir downloads (onnx + onnx.json from Hugging Face).
+        if (external.exists() && external.length() > 1024) {
+            return external.absolutePath
+        }
         return runCatching {
             context.assets.open(assetPath).use { input ->
                 val out = File(context.filesDir, assetPath)
                 out.parentFile?.mkdirs()
                 if (!out.exists() || out.length() < 1024) {
                     out.outputStream().use { output -> input.copyTo(output) }
+                }
+                // Copy matching config from assets when present.
+                runCatching {
+                    context.assets.open("$assetPath.json").use { cfgIn ->
+                        if (!config.exists() || config.length() < 16) {
+                            config.outputStream().use { cfgOut -> cfgIn.copyTo(cfgOut) }
+                        }
+                    }
                 }
                 if (out.exists() && out.length() > 1024) out.absolutePath else null
             }

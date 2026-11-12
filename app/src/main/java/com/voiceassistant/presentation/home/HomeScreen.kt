@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +26,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -34,6 +36,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -371,23 +376,47 @@ fun HomeScreen(
     }
 }
 
-/** Soft Auto-Guard when Piper pack is missing — continue with System TTS or open packs. */
+// Soft Auto-Guard when Piper pack is missing — continue with System TTS or open packs.
 @Composable
 internal fun AutoGuardSystemTtsDialog(
-    onDismiss: () -> Unit,
+    onDismiss: (dontShowAgain: Boolean) -> Unit = {},
     onOpenModelManager: () -> Unit
 ) {
+    var dontShowAgain by remember { mutableStateOf(false) }
+
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { onDismiss(dontShowAgain) },
         title = { Text(stringResource(R.string.guard_system_tts_title)) },
-        text = { Text(stringResource(R.string.guard_system_tts_body)) },
+        text = {
+            Column {
+                Text(stringResource(R.string.guard_system_tts_body))
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { dontShowAgain = !dontShowAgain }
+                ) {
+                    Checkbox(
+                        checked = dontShowAgain,
+                        onCheckedChange = { dontShowAgain = it }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.guard_dont_show_again),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        },
         confirmButton = {
-            TextButton(onClick = onOpenModelManager) {
+            TextButton(onClick = {
+                onDismiss(dontShowAgain)
+                onOpenModelManager()
+            }) {
                 Text(stringResource(R.string.guard_open_model_manager))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = { onDismiss(dontShowAgain) }) {
                 Text(stringResource(R.string.guard_continue))
             }
         }

@@ -28,6 +28,7 @@ class ResourcePackDownloadTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         coEvery { resourcePackManager.downloadMlKitLanguage(any(), any()) } just runs
+        coEvery { resourcePackManager.downloadPiperVoice(any()) } just runs
     }
 
     @After
@@ -61,6 +62,19 @@ class ResourcePackDownloadTest {
         }
         coVerify(exactly = 1) {
             resourcePackManager.downloadMlKitLanguage("vi", requireWifi = false)
+        }
+    }
+
+    @Test
+    fun modelManagerDownloadsPiperVoicePack() = runTest(testDispatcher) {
+        val viewModel = ModelManagerViewModel(resourcePackManager)
+        advanceUntilIdle()
+
+        viewModel.downloadPiper("preset_vi_demo")
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) {
+            resourcePackManager.downloadPiperVoice("preset_vi_demo")
         }
     }
 }

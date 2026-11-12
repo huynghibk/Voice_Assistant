@@ -21,13 +21,23 @@ class OnboardingPreferences @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private val keySetupDone = booleanPreferencesKey("setup_done")
+    private val keySuppressSystemTtsDialog = booleanPreferencesKey("suppress_system_tts_dialog")
 
     val setupDone: Flow<Boolean> = context.onboardingDataStore.data
         .map { prefs -> prefs[keySetupDone] ?: false }
 
+    val suppressSystemTtsDialog: Flow<Boolean> = context.onboardingDataStore.data
+        .map { prefs -> prefs[keySuppressSystemTtsDialog] ?: false }
+
     suspend fun setSetupDone(done: Boolean = true) {
         context.onboardingDataStore.edit { prefs ->
             prefs[keySetupDone] = done
+        }
+    }
+
+    suspend fun setSuppressSystemTtsDialog(suppress: Boolean = true) {
+        context.onboardingDataStore.edit { prefs ->
+            prefs[keySuppressSystemTtsDialog] = suppress
         }
     }
 }

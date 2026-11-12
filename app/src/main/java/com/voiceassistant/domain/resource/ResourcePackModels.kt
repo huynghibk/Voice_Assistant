@@ -1,17 +1,15 @@
 package com.voiceassistant.domain.resource
 
-/**
- * Catalog models for the offline resource center.
- * Phase 1: Piper = local/assets readiness only; ML Kit = downloadable packs.
- * Later: Piper remote catalog entries reuse [PiperVoicePack] with downloadUrl.
- */
+// Catalog models for the offline resource center.
 data class PiperVoicePack(
     val id: String,
     val displayName: String,
     val modelAssetPath: String,
     val qualityLabel: String = "Low",
-    val estimatedSizeMb: Int = 45,
-    val isReady: Boolean = false
+    val estimatedSizeMb: Int = 63,
+    val isReady: Boolean = false,
+    val modelDownloadUrl: String? = null,
+    val configDownloadUrl: String? = null
 )
 
 data class MlKitLanguagePack(

@@ -100,7 +100,7 @@
     <string name="model_manager_title">Trung tâm tải về</string>
     <string name="model_manager_subtitle">Quản lý giọng đọc ngoại tuyến và gói dịch ngôn ngữ</string>
     <string name="model_piper_section">Giọng đọc Piper</string>
-    <string name="model_piper_hint">Giai đoạn 1 hiển thị trạng thái model cục bộ. Nếu chưa có gói Piper, ứng dụng dùng giọng hệ thống Android.</string>
+    <string name="model_piper_hint">Tải giọng Piper (.onnx) từ Hugging Face vào máy. Khi chưa cài, ứng dụng dùng giọng hệ thống Android.</string>
     <string name="model_piper_meta">%1$s · ~%2$dMB</string>
     <string name="model_mlkit_pairs_section">Cặp dịch đề xuất</string>
     <string name="model_mlkit_section">Gói ngôn ngữ ML Kit</string>
@@ -117,6 +117,7 @@
     <string name="guard_system_tts_body">Chưa có model Piper cho giọng này. Ứng dụng sẽ đọc bằng giọng hệ thống Android. Mở Trung tâm tải về để kiểm tra gói.</string>
     <string name="guard_open_model_manager">Mở gói tải</string>
     <string name="guard_continue">Tiếp tục</string>
+    <string name="guard_dont_show_again">Không hiện lại</string>
     <string name="guard_mlkit_title">Cần gói dịch</string>
     <string name="guard_mlkit_body">Tải gói dịch ngoại tuyến (hỗ trợ Wi‑Fi và mạng di động), hoặc tiếp tục thử dịch trực tuyến bằng AI.</string>
     <string name="guard_download_now">Tải ngay</string>

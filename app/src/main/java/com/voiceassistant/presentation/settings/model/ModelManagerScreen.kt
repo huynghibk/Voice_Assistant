@@ -97,7 +97,11 @@ fun ModelManagerScreen(
             )
             Spacer(Modifier.height(8.dp))
             state.piperPacks.forEach { pack ->
-                PiperPackRow(pack = pack)
+                PiperPackRow(
+                    pack = pack,
+                    busy = state.busyPackId == pack.id,
+                    onDownload = { viewModel.downloadPiper(pack.id) }
+                )
                 Spacer(Modifier.height(8.dp))
             }
 
@@ -131,41 +135,55 @@ fun ModelManagerScreen(
 }
 
 @Composable
-private fun PiperPackRow(pack: PiperVoicePack) {
+private fun PiperPackRow(
+    pack: PiperVoicePack,
+    busy: Boolean,
+    onDownload: () -> Unit
+) {
     val extras = LocalVaExtra.current
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, extras.hairline, MaterialTheme.shapes.medium)
-            .padding(14.dp)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(pack.displayName, style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            stringResource(
-                R.string.model_piper_meta,
-                pack.qualityLabel,
-                pack.estimatedSizeMb
-            ),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            if (pack.isReady) {
-                stringResource(R.string.model_status_ready)
-            } else {
-                stringResource(R.string.model_status_system_tts)
-            },
-            style = MaterialTheme.typography.labelLarge,
-            color = if (pack.isReady) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
+        Column(modifier = Modifier.weight(1f)) {
+            Text(pack.displayName, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(
+                    R.string.model_piper_meta,
+                    pack.qualityLabel,
+                    pack.estimatedSizeMb
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (pack.isReady) {
+                    stringResource(R.string.model_status_ready)
+                } else {
+                    stringResource(R.string.model_status_system_tts)
+                },
+                style = MaterialTheme.typography.labelLarge,
+                color = if (pack.isReady) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        when {
+            busy -> CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+            !pack.isReady && pack.modelDownloadUrl != null -> TextButton(onClick = onDownload) {
+                Text(stringResource(R.string.model_download))
             }
-        )
+        }
     }
 }
 

@@ -55,7 +55,7 @@
     <string name="model_manager_title">下载中心</string>
     <string name="model_manager_subtitle">管理离线语音与翻译语言包</string>
     <string name="model_piper_section">Piper 语音</string>
-    <string name="model_piper_hint">第一阶段显示本地模型状态。若未安装 Piper 语音包，将使用 Android 系统语音。</string>
+    <string name="model_piper_hint">可从 Hugging Face 下载 Piper（.onnx）语音到本机。未安装时使用 Android 系统语音。</string>
     <string name="model_piper_meta">%1$s · ~%2$dMB</string>
     <string name="model_mlkit_pairs_section">推荐翻译语言对</string>
     <string name="model_mlkit_section">ML Kit 语言包</string>
@@ -72,6 +72,7 @@
     <string name="guard_system_tts_body">未安装该音色的 Piper 模型，将使用 Android 系统语音朗读。前往下载中心检查语音包。</string>
     <string name="guard_open_model_manager">打开下载</string>
     <string name="guard_continue">继续</string>
+    <string name="guard_dont_show_again">不再提示</string>
     <string name="guard_mlkit_title">需要翻译包</string>
     <string name="guard_mlkit_body">下载离线语言包（支持 Wi‑Fi 与移动蜂窝网络），或继续使用在线 AI 翻译。</string>
     <string name="guard_download_now">立即下载</string>

@@ -3,10 +3,8 @@ package com.voiceassistant.domain.tts
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Splits long text into sentence-sized chunks safe for ONNX TTS inference.
- * Prevents OOM / long blocking when users paste ~1000+ words into Quick TTS.
- */
+// Splits long text into sentence-sized chunks (period / newline / !?).
+// Never splits letter-by-letter or word-by-word for normal sentences.
 @Singleton
 class TextSplitter @Inject constructor() {
 
@@ -17,26 +15,28 @@ class TextSplitter @Inject constructor() {
             .trim()
         if (normalized.isEmpty()) return emptyList()
 
-        val sentenceRegex = Regex("""[^.!?…]+[.!?…]+|[^.!?…]+$""")
+        // Sentence boundaries only: . ! ? … or newline. Keep full sentences intact.
+        val sentenceRegex = Regex("""[^.!?…\n]+[.!?…\n]+|[^.!?…\n]+$""")
         val sentences = sentenceRegex.findAll(normalized)
             .map { it.value.trim() }
             .filter { it.isNotEmpty() }
             .toList()
 
-        if (sentences.isEmpty()) return softSplit(normalized, maxCharsPerChunk)
+        if (sentences.isEmpty()) return softSplitByWords(normalized, maxCharsPerChunk)
 
         val chunks = mutableListOf<String>()
         for (sentence in sentences) {
             if (sentence.length <= maxCharsPerChunk) {
                 chunks += sentence
             } else {
-                chunks += softSplit(sentence, maxCharsPerChunk)
+                chunks += softSplitByWords(sentence, maxCharsPerChunk)
             }
         }
         return chunks
     }
 
-    private fun softSplit(text: String, maxChars: Int): List<String> {
+    // Only used for oversized sentences — break on whitespace/punctuation, never per character.
+    private fun softSplitByWords(text: String, maxChars: Int): List<String> {
         if (text.length <= maxChars) return listOf(text)
         val result = mutableListOf<String>()
         var start = 0
@@ -45,17 +45,24 @@ class TextSplitter @Inject constructor() {
             if (end < text.length) {
                 val window = text.substring(start, end)
                 val breakAt = window.lastIndexOfAny(charArrayOf(' ', '\n', ',', ';', ':', '—', '-'))
-                if (breakAt > maxChars / 3) {
+                if (breakAt > 0) {
                     end = start + breakAt + 1
                 }
+                // If no whitespace in window, keep extending to next space to avoid letter chunks.
+                if (breakAt <= 0) {
+                    val nextSpace = text.indexOfAny(charArrayOf(' ', '\n'), startIndex = end)
+                    end = if (nextSpace > start) nextSpace + 1 else text.length
+                }
             }
-            result += text.substring(start, end).trim()
+            val piece = text.substring(start, end).trim()
+            if (piece.isNotEmpty()) result += piece
             start = end
         }
-        return result.filter { it.isNotEmpty() }
+        return result
     }
 
     companion object {
-        const val MAX_CHARS_PER_CHUNK = 220
+        // Large enough that typical paragraphs stay as whole sentences.
+        const val MAX_CHARS_PER_CHUNK = 500
     }
 }

@@ -117,7 +117,7 @@
     <string name="model_manager_title">Download Center</string>
     <string name="model_manager_subtitle">Manage offline voices and translation packs</string>
     <string name="model_piper_section">Piper voices</string>
-    <string name="model_piper_hint">Phase 1 shows local/assets status. Remote Piper download comes later. System TTS works without these packs.</string>
+    <string name="model_piper_hint">Download Piper .onnx voices from Hugging Face into the app. Until installed, Android System TTS is used.</string>
     <string name="model_piper_meta">%1$s · ~%2$dMB</string>
     <string name="model_mlkit_pairs_section">Recommended translation pairs</string>
     <string name="model_mlkit_section">ML Kit language packs</string>
@@ -134,6 +134,7 @@
     <string name="guard_system_tts_body">Piper model is not installed for this voice. Playback continues with Android System TTS. Open Download Center to check packs.</string>
     <string name="guard_open_model_manager">Open packs</string>
     <string name="guard_continue">Continue</string>
+    <string name="guard_dont_show_again">Don\'t show again</string>
     <string name="guard_mlkit_title">Translation pack needed</string>
     <string name="guard_mlkit_body">Download the offline language pack (Wi‑Fi or mobile data), or continue and try online AI translation.</string>
     <string name="guard_download_now">Download now</string>

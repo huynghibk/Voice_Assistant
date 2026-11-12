@@ -3,6 +3,8 @@ package com.voiceassistant.engine.tts
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
@@ -24,10 +26,8 @@ import javax.inject.Singleton
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/**
- * Real speech via Android [TextToSpeech] when Piper ONNX packs are not installed.
- * Synthesizes each sentence to a temp WAV, then returns PCM16.
- */
+// Real speech via Android TextToSpeech when Piper ONNX packs are not installed.
+// Synthesizes each sentence to a temp WAV, then returns PCM16.
 @Singleton
 class AndroidSystemTtsSynthesizer @Inject constructor(
     @ApplicationContext private val context: Context
@@ -35,6 +35,7 @@ class AndroidSystemTtsSynthesizer @Inject constructor(
     private val mutex = Mutex()
     private var tts: TextToSpeech? = null
     private var ready = false
+    private var enginePackage: String? = null
 
     suspend fun synthesize(
         sentence: String,
@@ -42,10 +43,64 @@ class AndroidSystemTtsSynthesizer @Inject constructor(
         speechRate: Float = 1.0f
     ): Pair<ShortArray, Int> =
         mutex.withLock {
+            val isVietnamese = localeHint.language.equals("vi", ignoreCase = true)
+            if (isVietnamese) {
+                ensurePreferredEngineLocked(GOOGLE_TTS_PACKAGE)
+            }
             val engine = ensureEngineLocked()
-            val locale = pickLocale(engine, localeHint)
-            runCatching { engine.language = locale }
-            // Keep pitch 1.0; rate changes tempo without “chipmunk” pitch bend from AudioTrack alone.
+
+            // Route audio strictly to USAGE_MEDIA / STREAM_MUSIC (never VOICE_COMMUNICATION).
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .setLegacyStreamType(AudioManager.STREAM_MUSIC)
+                .build()
+            runCatching { engine.setAudioAttributes(audioAttributes) }
+
+            val locale = if (isVietnamese) {
+                Locale.forLanguageTag("vi-VN")
+            } else {
+                pickLocale(engine, localeHint)
+            }
+
+            // Vietnamese: force vi-VN. Missing pack → notify + open TTS data installer.
+            val setLangResult = runCatching { engine.setLanguage(locale) }
+                .getOrDefault(TextToSpeech.LANG_NOT_SUPPORTED)
+            if (isVietnamese &&
+                (setLangResult == TextToSpeech.LANG_MISSING_DATA ||
+                    setLangResult == TextToSpeech.LANG_NOT_SUPPORTED)
+            ) {
+                openInstallTtsData()
+                error(
+                    "Thiếu gói dữ liệu giọng đọc tiếng Việt. " +
+                        "Vui lòng cài đặt gói giọng Google Tiếng Việt trong màn hình vừa mở để đọc tự nhiên."
+                )
+            }
+
+            // Prefer natural (network) Vietnamese / matching voice over robotic default.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                runCatching {
+                    val matchingVoices = engine.voices
+                        ?.filter { it.locale.language.equals(locale.language, ignoreCase = true) }
+                        .orEmpty()
+                    val naturalVoice = matchingVoices.firstOrNull {
+                        it.name.contains("network", ignoreCase = true) &&
+                            !it.isNetworkConnectionRequired
+                    } ?: matchingVoices.firstOrNull {
+                        it.name.contains("network", ignoreCase = true)
+                    } ?: matchingVoices.firstOrNull {
+                        it.locale.country.equals(locale.country, ignoreCase = true) &&
+                            !it.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)
+                    } ?: matchingVoices.firstOrNull {
+                        it.locale.country.equals(locale.country, ignoreCase = true)
+                    } ?: matchingVoices.firstOrNull()
+                    if (naturalVoice != null) {
+                        engine.voice = naturalVoice
+                    }
+                }
+            }
+
+            // Keep pitch 1.0; rate changes tempo without chipmunk pitch bend.
             engine.setSpeechRate(speechRate.coerceIn(0.5f, 2.5f))
             engine.setPitch(1.0f)
 
@@ -61,7 +116,7 @@ class AndroidSystemTtsSynthesizer @Inject constructor(
             }
         }
 
-    /** Pre-create the engine on Main so the first Play is faster / more reliable. */
+    // Pre-create the engine on Main so the first Play is faster / more reliable.
     suspend fun warmUp() {
         mutex.withLock { ensureEngineLocked() }
     }
@@ -71,17 +126,77 @@ class AndroidSystemTtsSynthesizer @Inject constructor(
         runCatching { tts?.shutdown() }
         tts = null
         ready = false
+        enginePackage = null
+    }
+
+    private fun openInstallTtsData() {
+        val installIntent = Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (isPackageInstalled(GOOGLE_TTS_PACKAGE)) {
+                setPackage(GOOGLE_TTS_PACKAGE)
+            }
+        }
+        runCatching { context.startActivity(installIntent) }
+    }
+
+    private suspend fun ensurePreferredEngineLocked(preferredPackage: String) {
+        if (ready && tts != null && enginePackage == preferredPackage) return
+        if (!isPackageInstalled(preferredPackage)) return
+        runCatching { tts?.shutdown() }
+        tts = null
+        ready = false
+        enginePackage = null
+        val (engine, status) = tryInitEngine(preferredPackage)
+        if (status == TextToSpeech.SUCCESS && engine != null) {
+            tts = engine
+            ready = true
+            enginePackage = preferredPackage
+        } else {
+            runCatching { engine?.shutdown() }
+        }
     }
 
     private suspend fun ensureEngineLocked(): TextToSpeech {
         tts?.takeIf { ready }?.let { return it }
 
-        // Previous attempt failed — reset and retry
         runCatching { tts?.shutdown() }
         tts = null
         ready = false
+        enginePackage = null
 
-        // 1. Try platform default engine first
+        // Prefer Google TTS first so Vietnamese reads naturally (not letter-spelling).
+        val preferred = linkedSetOf<String>()
+        if (isPackageInstalled(GOOGLE_TTS_PACKAGE)) preferred += GOOGLE_TTS_PACKAGE
+        preferred.addAll(buildEngineCandidates().filterNotNull())
+
+        var lastError = "no engine"
+
+        // Try default only after preferred packages if Google is missing.
+        if (preferred.isEmpty()) {
+            val (defaultTts, defaultStatus) = tryInitEngine(null)
+            if (defaultStatus == TextToSpeech.SUCCESS && defaultTts != null) {
+                tts = defaultTts
+                ready = true
+                enginePackage = null
+                return defaultTts
+            }
+            lastError = "engine=default status=$defaultStatus"
+            runCatching { defaultTts?.shutdown() }
+        }
+
+        for (pkg in preferred) {
+            val (fallbackTts, fallbackStatus) = tryInitEngine(pkg)
+            if (fallbackStatus == TextToSpeech.SUCCESS && fallbackTts != null) {
+                tts = fallbackTts
+                ready = true
+                enginePackage = pkg
+                return fallbackTts
+            }
+            lastError = "engine=$pkg status=$fallbackStatus"
+            runCatching { fallbackTts?.shutdown() }
+        }
+
+        // Last resort: platform default
         val (defaultTts, defaultStatus) = tryInitEngine(null)
         if (defaultStatus == TextToSpeech.SUCCESS && defaultTts != null) {
             tts = defaultTts
@@ -89,34 +204,9 @@ class AndroidSystemTtsSynthesizer @Inject constructor(
             return defaultTts
         }
 
-        // Default engine failed (status != SUCCESS) — extract candidate engines
-        val discoveredEngines = runCatching { defaultTts?.engines?.map { it.name }.orEmpty() }.getOrDefault(emptyList())
-        runCatching { defaultTts?.shutdown() }
-
-        var lastError = "engine=default status=$defaultStatus"
-
-        // 2. Build fallbacks: prefer "com.google.android.tts", first from getEngines(), then system candidates
-        val fallbacks = linkedSetOf<String>()
-        fallbacks += "com.google.android.tts"
-        discoveredEngines.firstOrNull()?.let { fallbacks += it }
-        fallbacks.addAll(discoveredEngines)
-        fallbacks.addAll(buildEngineCandidates().filterNotNull())
-
-        for (fallbackPkg in fallbacks) {
-            val (fallbackTts, fallbackStatus) = tryInitEngine(fallbackPkg)
-            if (fallbackStatus == TextToSpeech.SUCCESS && fallbackTts != null) {
-                tts = fallbackTts
-                ready = true
-                return fallbackTts
-            }
-            lastError = "engine=$fallbackPkg status=$fallbackStatus"
-            runCatching { fallbackTts?.shutdown() }
-        }
-
         error(
-            "Không khởi tạo được giọng đọc hệ thống" +
-                (lastError.let { " ($it)" }) +
-                ". Cài/ cập nhật Google Text-to-speech trên máy hoặc emulator."
+            "Không khởi tạo được giọng đọc hệ thống ($lastError). " +
+                "Cài/ cập nhật Google Text-to-speech trên máy."
         )
     }
 
@@ -141,16 +231,14 @@ class AndroidSystemTtsSynthesizer @Inject constructor(
 
     private fun buildEngineCandidates(): List<String?> {
         val installed = linkedSetOf<String>()
-        // Prefer known engines when present
         listOf(
-            "com.google.android.tts",
+            GOOGLE_TTS_PACKAGE,
             "com.samsung.SMT",
             "com.ivona.tts",
             "com.pico.voice"
         ).forEach { pkg ->
             if (isPackageInstalled(pkg)) installed += pkg
         }
-        // Also discover engines advertised by the system
         runCatching {
             val intent = Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE)
             val resolveFlags = if (Build.VERSION.SDK_INT >= 24) {
@@ -163,7 +251,6 @@ class AndroidSystemTtsSynthesizer @Inject constructor(
                 .mapNotNull { it.serviceInfo?.packageName }
                 .forEach { installed += it }
         }
-        // null = platform default engine (last resort)
         return installed.toList() + null
     }
 
@@ -186,7 +273,7 @@ class AndroidSystemTtsSynthesizer @Inject constructor(
             preferred,
             Locale.US,
             Locale.UK,
-            Locale("vi", "VN"),
+            Locale.forLanguageTag("vi-VN"),
             Locale.getDefault()
         )
         for (locale in candidates) {
@@ -242,10 +329,12 @@ class AndroidSystemTtsSynthesizer @Inject constructor(
     }
 
     companion object {
+        private const val GOOGLE_TTS_PACKAGE = "com.google.android.tts"
+
         fun localeForVoiceId(voiceId: String?, voiceName: String?): Locale {
             val key = "${voiceId.orEmpty()} ${voiceName.orEmpty()}".lowercase(Locale.ROOT)
             return when {
-                "vi" in key || "vietnam" in key || "việt" in key -> Locale("vi", "VN")
+                "vi" in key || "vietnam" in key || "việt" in key -> Locale.forLanguageTag("vi-VN")
                 "en" in key || "amy" in key || "ryan" in key -> Locale.US
                 else -> Locale.US
             }

@@ -1,15 +1,12 @@
 # Piper voice models
 
-Place Piper ONNX voice packs here, for example:
+Download Piper voices from the in-app **Download Center**, or place packs here:
 
-- `en_US-amy-low.onnx`
-- `en_US-amy-low.onnx.json`
-- `en_US-ryan-low.onnx`
-- `vi_VN-*.onnx` (when available)
+- `vi_VN-demo-low.onnx` + `vi_VN-demo-low.onnx.json`
+- `en_US-amy-low.onnx` + `en_US-amy-low.onnx.json`
+- `en_US-ryan-low.onnx` + `en_US-ryan-low.onnx.json`
 
-Download community Piper voices from the Piper / rhasspy voice release pages,
-then copy the `.onnx` + `.json` pair into this folder (or into the app
-`filesDir/models/piper/` after install).
+Public source: `https://huggingface.co/rhasspy/piper-voices`
 
-Until a model file is present, the app uses a demo tone synthesizer so that
-TextSplitter + queue + AudioTrack streaming can still be tested end-to-end.
+Downloaded files are stored in the app `filesDir/models/piper/`.
+Until a model file is present, the app uses Android System TTS.

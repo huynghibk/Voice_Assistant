@@ -61,6 +61,37 @@ class ModelManagerViewModel @Inject constructor(
         }
     }
 
+    fun downloadPiper(packId: String) {
+        viewModelScope.launch {
+            val name = _uiState.value.piperPacks.firstOrNull { it.id == packId }?.displayName
+                ?: packId
+            _uiState.update {
+                it.copy(
+                    busyPackId = packId,
+                    statusMessage = "Đang tải giọng $name (~63MB)…"
+                )
+            }
+            runCatching {
+                resourcePackManager.downloadPiperVoice(packId)
+            }.onSuccess {
+                _uiState.update {
+                    it.copy(
+                        busyPackId = null,
+                        statusMessage = "Đã tải $name. Ứng dụng sẽ dùng Piper ONNX."
+                    )
+                }
+                refresh()
+            }.onFailure { e ->
+                _uiState.update {
+                    it.copy(
+                        busyPackId = null,
+                        statusMessage = e.message ?: "Tải giọng Piper thất bại."
+                    )
+                }
+            }
+        }
+    }
+
     fun downloadLanguage(code: String) {
         viewModelScope.launch {
             _uiState.update {
