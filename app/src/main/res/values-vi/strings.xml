@@ -85,4 +85,51 @@
     <string name="settings_help_3">3. Bấm Phát để nghe. Bấm Dừng nếu muốn ngắt giữa chừng.</string>
     <string name="settings_help_4">4. Chọn định dạng xuất rồi bấm Xuất / Chia sẻ khi cần lưu file.</string>
     <string name="settings_help_5">5. Văn bản dài: dùng tab Dự án để lưu và chỉnh sửa theo dự án.</string>
+
+    <string name="settings_model_manager">Quản lý model &amp; gói ngôn ngữ</string>
+    <string name="settings_model_manager_subtitle">Trạng thái giọng Piper và các gói ML Kit ngoại tuyến</string>
+    <string name="settings_ai_section">Cấu hình AI</string>
+    <string name="settings_gemini_title">Gemini API Key</string>
+    <string name="settings_gemini_subtitle">Dán API key để dùng tính năng dịch AI trực tuyến</string>
+    <string name="settings_gemini_saved">Đã lưu API key cá nhân trên thiết bị này</string>
+    <string name="settings_gemini_hint">AIza…</string>
+    <string name="settings_gemini_help">Lấy key miễn phí từ Google AI Studio (nhấn để mở)</string>
+    <string name="settings_gemini_save">Lưu key</string>
+    <string name="settings_gemini_clear">Xóa</string>
+
+    <string name="model_manager_title">Trung tâm tải về</string>
+    <string name="model_manager_subtitle">Quản lý giọng đọc ngoại tuyến và gói dịch ngôn ngữ</string>
+    <string name="model_piper_section">Giọng đọc Piper</string>
+    <string name="model_piper_hint">Giai đoạn 1 hiển thị trạng thái model cục bộ. Nếu chưa có gói Piper, ứng dụng dùng giọng hệ thống Android.</string>
+    <string name="model_piper_meta">%1$s · ~%2$dMB</string>
+    <string name="model_mlkit_pairs_section">Cặp dịch đề xuất</string>
+    <string name="model_mlkit_section">Gói ngôn ngữ ML Kit</string>
+    <string name="model_size_mb">~%1$dMB</string>
+    <string name="model_status_ready">Đã cài đặt</string>
+    <string name="model_status_system_tts">Chưa có — sẽ dùng giọng hệ thống</string>
+    <string name="model_status_installed">Đã cài đặt</string>
+    <string name="model_status_not_installed">Chưa cài đặt</string>
+    <string name="model_download">Tải về</string>
+    <string name="model_delete">Xóa</string>
+    <string name="model_downloading">Đang tải…</string>
+
+    <string name="guard_system_tts_title">Đang dùng giọng hệ thống</string>
+    <string name="guard_system_tts_body">Chưa có model Piper cho giọng này. Ứng dụng sẽ đọc bằng giọng hệ thống Android. Mở Trung tâm tải về để kiểm tra gói.</string>
+    <string name="guard_open_model_manager">Mở gói tải</string>
+    <string name="guard_continue">Tiếp tục</string>
+    <string name="guard_mlkit_title">Cần gói dịch</string>
+    <string name="guard_mlkit_body">Tải gói dịch ngoại tuyến (hỗ trợ Wi‑Fi và mạng di động), hoặc tiếp tục thử dịch trực tuyến bằng AI.</string>
+    <string name="guard_download_now">Tải ngay</string>
+    <string name="guard_try_online">Dùng trực tuyến</string>
+
+    <string name="onboarding_title">Thiết lập ban đầu</string>
+    <string name="onboarding_body">Trước khi bắt đầu, kiểm tra tài nguyên ngoại tuyến. Bộ đọc TTS đã sẵn sàng với giọng hệ thống.</string>
+    <string name="onboarding_piper_ready">Gói Piper: đã sẵn sàng</string>
+    <string name="onboarding_piper_system">Gói Piper: chưa có — giọng hệ thống đã sẵn sàng</string>
+    <string name="onboarding_mlkit_ready">Gói dịch EN–VI: đã cài đặt</string>
+    <string name="onboarding_mlkit_need">Gói dịch EN–VI: chưa cài đặt (~60MB)</string>
+    <string name="onboarding_download_en_vi">Tải gói EN–VI</string>
+    <string name="onboarding_downloading_en_vi">Đang tải gói EN–VI…</string>
+    <string name="onboarding_skip">Để sau</string>
+    <string name="onboarding_done">Hoàn tất</string>
 </resources>

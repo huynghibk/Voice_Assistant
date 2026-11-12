@@ -40,4 +40,51 @@
     <string name="settings_help_3">3. 点击播放收听，可随时停止。</string>
     <string name="settings_help_4">4. 选择导出格式，然后导出/分享。</string>
     <string name="settings_help_5">5. 长文本请在“项目”中保存与编辑。</string>
+
+    <string name="settings_model_manager">模型与语言包</string>
+    <string name="settings_model_manager_subtitle">Piper 语音状态与离线 ML Kit 语言包</string>
+    <string name="settings_ai_section">AI 配置</string>
+    <string name="settings_gemini_title">Gemini API Key</string>
+    <string name="settings_gemini_subtitle">粘贴 API Key 以使用在线 AI 翻译</string>
+    <string name="settings_gemini_saved">本机已保存个人 API Key</string>
+    <string name="settings_gemini_hint">AIza…</string>
+    <string name="settings_gemini_help">从 Google AI Studio 获取免费 Key（点击打开）</string>
+    <string name="settings_gemini_save">保存 Key</string>
+    <string name="settings_gemini_clear">清除</string>
+
+    <string name="model_manager_title">下载中心</string>
+    <string name="model_manager_subtitle">管理离线语音与翻译语言包</string>
+    <string name="model_piper_section">Piper 语音</string>
+    <string name="model_piper_hint">第一阶段显示本地模型状态。若未安装 Piper 语音包，将使用 Android 系统语音。</string>
+    <string name="model_piper_meta">%1$s · ~%2$dMB</string>
+    <string name="model_mlkit_pairs_section">推荐翻译语言对</string>
+    <string name="model_mlkit_section">ML Kit 语言包</string>
+    <string name="model_size_mb">~%1$dMB</string>
+    <string name="model_status_ready">已安装</string>
+    <string name="model_status_system_tts">未找到 — 将使用系统语音</string>
+    <string name="model_status_installed">已安装</string>
+    <string name="model_status_not_installed">未安装</string>
+    <string name="model_download">下载</string>
+    <string name="model_delete">删除</string>
+    <string name="model_downloading">下载中…</string>
+
+    <string name="guard_system_tts_title">正在使用系统语音</string>
+    <string name="guard_system_tts_body">未安装该音色的 Piper 模型，将使用 Android 系统语音朗读。前往下载中心检查语音包。</string>
+    <string name="guard_open_model_manager">打开下载</string>
+    <string name="guard_continue">继续</string>
+    <string name="guard_mlkit_title">需要翻译包</string>
+    <string name="guard_mlkit_body">下载离线语言包（支持 Wi‑Fi 与移动蜂窝网络），或继续使用在线 AI 翻译。</string>
+    <string name="guard_download_now">立即下载</string>
+    <string name="guard_try_online">在线翻译</string>
+
+    <string name="onboarding_title">初次设置</string>
+    <string name="onboarding_body">开始前请检查离线资源。系统语音已可直接朗读。</string>
+    <string name="onboarding_piper_ready">Piper 语音包：已就绪</string>
+    <string name="onboarding_piper_system">Piper 语音包：未找到 — 系统语音已就绪</string>
+    <string name="onboarding_mlkit_ready">EN–VI 翻译包：已安装</string>
+    <string name="onboarding_mlkit_need">EN–VI 翻译包：未安装 (~60MB)</string>
+    <string name="onboarding_download_en_vi">下载 EN–VI</string>
+    <string name="onboarding_downloading_en_vi">正在下载 EN–VI 语言包…</string>
+    <string name="onboarding_skip">稍后再说</string>
+    <string name="onboarding_done">完成</string>
 </resources>

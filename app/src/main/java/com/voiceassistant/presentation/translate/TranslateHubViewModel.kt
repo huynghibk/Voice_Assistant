@@ -150,8 +150,8 @@ class TranslateHubViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isDownloadingPack = true, statusMessage = "Đang tải gói dịch…") }
             runCatching {
-                resourcePackManager.downloadMlKitLanguage(src, requireWifi = true)
-                resourcePackManager.downloadMlKitLanguage(tgt, requireWifi = true)
+                resourcePackManager.downloadMlKitLanguage(src, requireWifi = false)
+                resourcePackManager.downloadMlKitLanguage(tgt, requireWifi = false)
             }.onSuccess {
                 _uiState.update {
                     it.copy(

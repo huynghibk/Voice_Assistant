@@ -135,7 +135,7 @@
     <string name="guard_open_model_manager">Open packs</string>
     <string name="guard_continue">Continue</string>
     <string name="guard_mlkit_title">Translation pack needed</string>
-    <string name="guard_mlkit_body">Download the offline language pack over Wi‑Fi, or continue and try online AI translation.</string>
+    <string name="guard_mlkit_body">Download the offline language pack (Wi‑Fi or mobile data), or continue and try online AI translation.</string>
     <string name="guard_download_now">Download now</string>
     <string name="guard_try_online">Try online</string>
 
@@ -145,7 +145,8 @@
     <string name="onboarding_piper_system">Piper pack: not found — System TTS is ready</string>
     <string name="onboarding_mlkit_ready">EN–VI translation pack: installed</string>
     <string name="onboarding_mlkit_need">EN–VI translation pack: not installed (~60MB)</string>
-    <string name="onboarding_download_en_vi">Download EN–VI (Wi‑Fi)</string>
+    <string name="onboarding_download_en_vi">Download EN–VI</string>
+    <string name="onboarding_downloading_en_vi">Downloading EN–VI translation pack…</string>
     <string name="onboarding_skip">Skip for now</string>
     <string name="onboarding_done">Done</string>
 </resources>

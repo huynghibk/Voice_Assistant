@@ -13,10 +13,13 @@ import com.voiceassistant.domain.resource.PiperVoicePack
 import com.voiceassistant.domain.resource.ResourcePackManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 @Singleton
 class ResourcePackManagerImpl @Inject constructor(
@@ -129,11 +132,20 @@ class ResourcePackManagerImpl @Inject constructor(
     override suspend fun downloadMlKitLanguage(languageCode: String, requireWifi: Boolean) =
         withContext(Dispatchers.IO) {
             val model = TranslateRemoteModel.Builder(languageCode).build()
-            val conditions = DownloadConditions.Builder().apply {
-                if (requireWifi) requireWifi()
-            }.build()
-            Tasks.await(modelManager.download(model, conditions))
-            Unit
+            val conditions = if (requireWifi) {
+                DownloadConditions.Builder().requireWifi().build()
+            } else {
+                DownloadConditions.Builder().build()
+            }
+            suspendCancellableCoroutine { cont ->
+                modelManager.download(model, conditions)
+                    .addOnSuccessListener {
+                        if (cont.isActive) cont.resume(Unit)
+                    }
+                    .addOnFailureListener { error ->
+                        if (cont.isActive) cont.resumeWithException(error)
+                    }
+            }
         }
 
     override suspend fun deleteMlKitLanguage(languageCode: String) =

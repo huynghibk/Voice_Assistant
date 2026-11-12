@@ -169,8 +169,8 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(onboardingDownloading = true) }
             runCatching {
-                resourcePackManager.downloadMlKitLanguage("en", requireWifi = true)
-                resourcePackManager.downloadMlKitLanguage("vi", requireWifi = true)
+                resourcePackManager.downloadMlKitLanguage("en", requireWifi = false)
+                resourcePackManager.downloadMlKitLanguage("vi", requireWifi = false)
             }.onSuccess {
                 _uiState.update {
                     it.copy(
@@ -183,7 +183,7 @@ class HomeViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         onboardingDownloading = false,
-                        statusMessage = e.message ?: "Tải gói dịch thất bại. Thử lại qua Wi‑Fi."
+                        statusMessage = e.message ?: "Tải gói dịch thất bại. Vui lòng kiểm tra kết nối mạng."
                     )
                 }
             }

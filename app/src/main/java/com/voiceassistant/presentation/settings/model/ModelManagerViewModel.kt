@@ -66,11 +66,11 @@ class ModelManagerViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     busyPackId = code,
-                    statusMessage = "Đang tải $code (ưu tiên Wi‑Fi)…"
+                    statusMessage = "Đang tải $code…"
                 )
             }
             runCatching {
-                resourcePackManager.downloadMlKitLanguage(code, requireWifi = true)
+                resourcePackManager.downloadMlKitLanguage(code, requireWifi = false)
             }.onSuccess {
                 _uiState.update { it.copy(busyPackId = null, statusMessage = "Đã tải $code.") }
                 refresh()
@@ -111,8 +111,8 @@ class ModelManagerViewModel @Inject constructor(
                 it.copy(busyPackId = id, statusMessage = "Đang tải cặp $source ↔ $target…")
             }
             runCatching {
-                resourcePackManager.downloadMlKitLanguage(source, requireWifi = true)
-                resourcePackManager.downloadMlKitLanguage(target, requireWifi = true)
+                resourcePackManager.downloadMlKitLanguage(source, requireWifi = false)
+                resourcePackManager.downloadMlKitLanguage(target, requireWifi = false)
             }.onSuccess {
                 _uiState.update {
                     it.copy(busyPackId = null, statusMessage = "Đã tải cặp $source ↔ $target.")

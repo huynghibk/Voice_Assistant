@@ -81,41 +81,62 @@ class AndroidSystemTtsSynthesizer @Inject constructor(
         tts = null
         ready = false
 
-        val enginePackages = buildEngineCandidates()
-        var lastError: String? = null
+        // 1. Try platform default engine first
+        val (defaultTts, defaultStatus) = tryInitEngine(null)
+        if (defaultStatus == TextToSpeech.SUCCESS && defaultTts != null) {
+            tts = defaultTts
+            ready = true
+            return defaultTts
+        }
 
-        for (enginePackage in enginePackages) {
-            val result = CompletableDeferred<Int>()
-            val created = withContext(Dispatchers.Main) {
-                runCatching {
-                    if (enginePackage == null) {
-                        TextToSpeech(context) { status -> result.complete(status) }
-                    } else {
-                        TextToSpeech(context, { status -> result.complete(status) }, enginePackage)
-                    }
-                }.getOrElse {
-                    result.complete(TextToSpeech.ERROR)
-                    null
-                }
-            } ?: continue
+        // Default engine failed (status != SUCCESS) — extract candidate engines
+        val discoveredEngines = runCatching { defaultTts?.engines?.map { it.name }.orEmpty() }.getOrDefault(emptyList())
+        runCatching { defaultTts?.shutdown() }
 
-            tts = created
-            val status = withTimeoutOrNull(12_000) { result.await() } ?: TextToSpeech.ERROR
-            if (status == TextToSpeech.SUCCESS) {
+        var lastError = "engine=default status=$defaultStatus"
+
+        // 2. Build fallbacks: prefer "com.google.android.tts", first from getEngines(), then system candidates
+        val fallbacks = linkedSetOf<String>()
+        fallbacks += "com.google.android.tts"
+        discoveredEngines.firstOrNull()?.let { fallbacks += it }
+        fallbacks.addAll(discoveredEngines)
+        fallbacks.addAll(buildEngineCandidates().filterNotNull())
+
+        for (fallbackPkg in fallbacks) {
+            val (fallbackTts, fallbackStatus) = tryInitEngine(fallbackPkg)
+            if (fallbackStatus == TextToSpeech.SUCCESS && fallbackTts != null) {
+                tts = fallbackTts
                 ready = true
-                return created
+                return fallbackTts
             }
-
-            lastError = "engine=${enginePackage ?: "default"} status=$status"
-            runCatching { created.shutdown() }
-            tts = null
+            lastError = "engine=$fallbackPkg status=$fallbackStatus"
+            runCatching { fallbackTts?.shutdown() }
         }
 
         error(
             "Không khởi tạo được giọng đọc hệ thống" +
-                (lastError?.let { " ($it)" } ?: "") +
+                (lastError.let { " ($it)" }) +
                 ". Cài/ cập nhật Google Text-to-speech trên máy hoặc emulator."
         )
+    }
+
+    private suspend fun tryInitEngine(enginePackage: String?): Pair<TextToSpeech?, Int> {
+        val result = CompletableDeferred<Int>()
+        val created = withContext(Dispatchers.Main) {
+            runCatching {
+                if (enginePackage == null) {
+                    TextToSpeech(context) { status -> result.complete(status) }
+                } else {
+                    TextToSpeech(context, { status -> result.complete(status) }, enginePackage)
+                }
+            }.getOrElse {
+                result.complete(TextToSpeech.ERROR)
+                null
+            }
+        } ?: return Pair(null, TextToSpeech.ERROR)
+
+        val status = withTimeoutOrNull(10_000) { result.await() } ?: TextToSpeech.ERROR
+        return Pair(created, status)
     }
 
     private fun buildEngineCandidates(): List<String?> {
