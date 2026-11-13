@@ -1,6 +1,7 @@
 package com.voiceassistant.presentation.home
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,9 +26,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.MicOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -63,6 +69,7 @@ import com.voiceassistant.presentation.components.VaStatusBar
 import com.voiceassistant.presentation.components.VaVoiceChip
 import com.voiceassistant.presentation.theme.LocalVaExtra
 import com.voiceassistant.presentation.theme.VaDimens
+import androidx.compose.foundation.verticalScroll
 
 @Composable
 fun HomeScreen(
@@ -82,6 +89,26 @@ fun HomeScreen(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) viewModel.startListening()
+    }
+
+    val speechIntentLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            viewModel.onSpeechIntentResult(result.data)
+        } else {
+            viewModel.stopListening()
+        }
+    }
+
+    LaunchedEffect(state.pendingSpeechIntent) {
+        if (!state.pendingSpeechIntent) return@LaunchedEffect
+        viewModel.onSpeechIntentConsumed()
+        runCatching {
+            speechIntentLauncher.launch(viewModel.createSpeechIntent())
+        }.onFailure {
+            viewModel.onSpeechIntentLaunchFailed()
+        }
     }
 
     LaunchedEffect(pendingScannerText) {
@@ -157,25 +184,45 @@ fun HomeScreen(
                 onDismissRequest = viewModel::dismissOnboarding,
                 title = { Text(stringResource(R.string.onboarding_title)) },
                 text = {
-                    Column {
-                        Text(stringResource(R.string.onboarding_body))
-                        Spacer(Modifier.height(8.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         Text(
-                            if (state.onboardingPiperReady) {
+                            text = stringResource(R.string.onboarding_body),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = if (state.onboardingPiperReady) {
                                 stringResource(R.string.onboarding_piper_ready)
                             } else {
                                 stringResource(R.string.onboarding_piper_system)
-                            }
+                            },
+                            style = MaterialTheme.typography.bodyMedium
                         )
+                        if (!state.onboardingPiperReady) {
+                            TextButton(
+                                onClick = {
+                                    viewModel.dismissOnboarding()
+                                    onOpenModelManager()
+                                },
+                                enabled = !state.onboardingDownloading,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Tải giọng đọc Piper (Tiếng Việt / English)")
+                            }
+                        }
                         Text(
-                            if (state.onboardingMlKitReady) {
+                            text = if (state.onboardingMlKitReady) {
                                 stringResource(R.string.onboarding_mlkit_ready)
                             } else {
                                 stringResource(R.string.onboarding_mlkit_need)
-                            }
+                            },
+                            style = MaterialTheme.typography.bodyMedium
                         )
                         if (state.onboardingDownloading) {
-                            Spacer(Modifier.height(12.dp))
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -218,19 +265,70 @@ fun HomeScreen(
             )
         }
 
+
         Spacer(Modifier.height(VaDimens.sectionGap))
         VaSectionLabel(stringResource(R.string.home_voices))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(VaDimens.chipGap)) {
             items(state.voices, key = { it.id }) { voice ->
+                val piperReady = state.piperReadyByVoiceId[voice.id] == true
+                val isClone = !voice.isPreset && voice.embeddingPath != null
                 VaVoiceChip(
                     label = voice.name,
                     subtitle = stringResource(
-                        if (voice.isPreset) R.string.home_voice_preset
-                        else R.string.home_voice_saved
+                        when {
+                            isClone && piperReady -> R.string.home_voice_clone_ready
+                            isClone -> R.string.home_voice_clone_needs_piper
+                            piperReady -> R.string.home_voice_piper_ready
+                            voice.isPreset -> R.string.home_voice_system_fallback
+                            else -> R.string.home_voice_saved
+                        }
                     ),
                     selected = voice.id == state.selectedVoiceId,
                     onClick = { viewModel.onVoiceSelected(voice.id) }
                 )
+            }
+        }
+
+        Spacer(Modifier.height(VaDimens.sectionGap))
+        VaSectionLabel(stringResource(R.string.home_read_mode_section))
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(VaDimens.chipGap)
+        ) {
+            VaVoiceChip(
+                label = stringResource(R.string.home_read_original),
+                selected = state.readMode == HomeReadMode.ORIGINAL,
+                onClick = { viewModel.onReadModeSelected(HomeReadMode.ORIGINAL) }
+            )
+            VaVoiceChip(
+                label = stringResource(R.string.home_translate_read),
+                selected = state.readMode == HomeReadMode.TRANSLATE_AND_READ,
+                onClick = { viewModel.onReadModeSelected(HomeReadMode.TRANSLATE_AND_READ) }
+            )
+        }
+
+        if (state.readMode == HomeReadMode.TRANSLATE_AND_READ) {
+            Spacer(Modifier.height(VaDimens.sectionGap))
+            VaSectionLabel(stringResource(R.string.home_translate_section))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(VaDimens.chipGap),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    stringResource(R.string.home_target_lang),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                state.translateLanguages.forEach { lang ->
+                    VaVoiceChip(
+                        label = lang.label,
+                        selected = state.selectedTargetLang == lang.id,
+                        onClick = { viewModel.onTargetLang(lang.id) }
+                    )
+                }
             }
         }
 
@@ -245,41 +343,80 @@ fun HomeScreen(
                     .weight(1f)
             )
         } else {
-            OutlinedTextField(
-                value = state.text,
-                onValueChange = viewModel::onTextChange,
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-                placeholder = {
-                    Text(
-                        stringResource(R.string.home_text_hint),
-                        style = MaterialTheme.typography.bodyLarge
+                    .weight(1f)
+            ) {
+                OutlinedTextField(
+                    value = state.text,
+                    onValueChange = viewModel::onTextChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    placeholder = {
+                        Text(
+                            stringResource(R.string.home_text_hint),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    },
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    shape = MaterialTheme.shapes.large,
+                    trailingIcon = {
+                        if (state.isTranslating) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            IconButton(
+                                onClick = ::onMicClick,
+                                enabled = !state.isPlaying
+                            ) {
+                                Icon(
+                                    imageVector = if (state.isListening) {
+                                        Icons.Outlined.MicOff
+                                    } else {
+                                        Icons.Outlined.Mic
+                                    },
+                                    contentDescription = stringResource(
+                                        if (state.isListening) {
+                                            R.string.home_stop_record
+                                        } else {
+                                            R.string.translate_mic
+                                        }
+                                    ),
+                                    tint = if (state.isListening) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    }
+                                )
+                            }
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = extras.hairline,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        cursorColor = MaterialTheme.colorScheme.primary
                     )
-                },
-                textStyle = MaterialTheme.typography.bodyLarge,
-                shape = MaterialTheme.shapes.large,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = extras.hairline,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                    cursorColor = MaterialTheme.colorScheme.primary
                 )
-            )
+                if (state.translatedText.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    VaSectionLabel(stringResource(R.string.translate_result_box))
+                    Text(
+                        text = state.translatedText,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                    )
+                }
+            }
         }
-
-        Spacer(Modifier.height(12.dp))
-        VaPrimaryButton(
-            text = if (state.isListening) {
-                stringResource(R.string.home_stop_record)
-            } else {
-                stringResource(R.string.home_record)
-            },
-            onClick = ::onMicClick,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !state.isPlaying
-        )
 
         Spacer(Modifier.height(12.dp))
         VaSectionLabel(stringResource(R.string.home_speed))

@@ -53,18 +53,35 @@ class ResourcePackManagerImpl @Inject constructor(
         Triple(TranslateLanguage.FRENCH, TranslateLanguage.VIETNAMESE, "FR ↔ VI")
     )
 
-    // HuggingFace rhasspy/piper-voices — .onnx + .onnx.json pairs.
     private val piperCatalog = listOf(
         PiperVoicePack(
             id = "preset_vi_demo",
-            displayName = "Tiếng Việt",
-            modelAssetPath = "models/piper/vi_VN-demo-low.onnx",
-            qualityLabel = "Low",
-            estimatedSizeMb = 63,
-            modelDownloadUrl =
-                "$HF_BASE/vi/vi_VN/25hours_single/low/vi_VN-25hours_single-low.onnx",
-            configDownloadUrl =
-                "$HF_BASE/vi/vi_VN/25hours_single/low/vi_VN-25hours_single-low.onnx.json"
+            displayName = "Tiếng Việt · MMS (vits-mms-vie)",
+            modelAssetPath = "models/sherpa/vits-mms-vie/model.onnx",
+            qualityLabel = "HQ",
+            estimatedSizeMb = 103,
+            // Symmetris repo uses ISO 639-3 folder names; Vietnamese is `vie` (not on HF yet).
+            // Until upstream publishes `vie/`, use Piper 25h for on-device Vietnamese TTS.
+            modelDownloadUrl = null,
+            companionDownloadUrls = emptyMap()
+        ),
+        PiperVoicePack(
+            id = "preset_vi_piper_25h",
+            displayName = "Tiếng Việt · Piper 25h",
+            modelAssetPath = "models/piper/vi_VN-25hours_single-low.onnx",
+            qualityLabel = "Recommended",
+            estimatedSizeMb = 64,
+            sherpaTarballUrl = "$SHERPA_RELEASE/vits-piper-vi_VN-25hours_single-low.tar.bz2",
+            modelDownloadUrl = "$HF_BASE/vi/vi_VN/25hours_single/low/vi_VN-25hours_single-low.onnx",
+            configDownloadUrl = "$HF_BASE/vi/vi_VN/25hours_single/low/vi_VN-25hours_single-low.onnx.json"
+        ),
+        PiperVoicePack(
+            id = "preset_zh_melo",
+            displayName = "中文 · Melo (zh+en)",
+            modelAssetPath = "models/sherpa/vits-melo-tts-zh_en/model.onnx",
+            qualityLabel = "HQ",
+            estimatedSizeMb = 170,
+            sherpaTarballUrl = "$SHERPA_RELEASE/vits-melo-tts-zh_en.tar.bz2"
         ),
         PiperVoicePack(
             id = "preset_en_amy",
@@ -97,26 +114,20 @@ class ResourcePackManagerImpl @Inject constructor(
         if (modelAssetPath.isNullOrBlank()) return false
         if (!modelAssetPath.endsWith(".onnx", ignoreCase = true)) return false
         val external = File(context.filesDir, modelAssetPath)
-        val config = File(context.filesDir, "$modelAssetPath.json")
-        if (external.exists() && external.length() > 1024 &&
-            config.exists() && config.length() > 16
-        ) {
-            return true
-        }
-        // Also accept assets-bundled models (legacy).
+        if (TtsModelReadiness.isOnnxReady(external)) return true
         return runCatching {
-            context.assets.openFd(modelAssetPath).use { it.length > 1024 }
+            context.assets.openFd(modelAssetPath).use { it.length > MIN_PIPER_ONNX_BYTES }
         }.getOrElse {
             runCatching {
                 context.assets.open(modelAssetPath).use { input ->
-                    var total = 0
+                    var total = 0L
                     val buf = ByteArray(8 * 1024)
-                    while (total <= 1024) {
+                    while (total < MIN_PIPER_ONNX_BYTES) {
                         val n = input.read(buf)
                         if (n <= 0) break
                         total += n
                     }
-                    total > 1024
+                    total >= MIN_PIPER_ONNX_BYTES
                 }
             }.getOrDefault(false)
         }
@@ -128,43 +139,95 @@ class ResourcePackManagerImpl @Inject constructor(
     override suspend fun downloadPiperVoice(packId: String) = withContext(Dispatchers.IO) {
         val pack = piperCatalog.firstOrNull { it.id == packId }
             ?: error("Không tìm thấy gói giọng $packId.")
+        if (!pack.sherpaTarballUrl.isNullOrBlank()) {
+            try {
+                downloadSherpaTarball(pack)
+                return@withContext
+            } catch (e: Exception) {
+                if (pack.modelDownloadUrl.isNullOrBlank()) throw e
+            }
+        }
         val modelUrl = pack.modelDownloadUrl
-            ?: error("Gói ${pack.displayName} chưa hỗ trợ tải về.")
-        val configUrl = pack.configDownloadUrl
-            ?: error("Gói ${pack.displayName} thiếu URL file cấu hình.")
-
+            ?: error("Gói ${pack.displayName} chưa hỗ trợ tải về (đang chờ bản ONNX trên Hugging Face).")
         val modelFile = File(context.filesDir, pack.modelAssetPath)
-        val configFile = File(context.filesDir, "${pack.modelAssetPath}.json")
         modelFile.parentFile?.mkdirs()
 
         val modelTmp = File(modelFile.parentFile, "${modelFile.name}.part")
-        val configTmp = File(configFile.parentFile, "${configFile.name}.part")
+        val temps = mutableListOf(modelTmp)
         try {
             downloadToFile(modelUrl, modelTmp)
-            downloadToFile(configUrl, configTmp)
             if (modelTmp.length() < 1024L) {
                 error("File model Piper tải về bị lỗi (quá nhỏ).")
             }
-            if (configTmp.length() < 16L) {
-                error("File cấu hình Piper tải về bị lỗi.")
-            }
             if (modelFile.exists()) modelFile.delete()
-            if (configFile.exists()) configFile.delete()
             if (!modelTmp.renameTo(modelFile)) {
                 modelTmp.copyTo(modelFile, overwrite = true)
                 modelTmp.delete()
             }
-            if (!configTmp.renameTo(configFile)) {
-                configTmp.copyTo(configFile, overwrite = true)
-                configTmp.delete()
+
+            val configUrl = pack.configDownloadUrl
+            if (!configUrl.isNullOrBlank()) {
+                val configFile = File(context.filesDir, "${pack.modelAssetPath}.json")
+                val configTmp = File(configFile.parentFile, "${configFile.name}.part")
+                temps += configTmp
+                downloadToFile(configUrl, configTmp)
+                if (configTmp.length() < 16L) {
+                    error("File cấu hình Piper tải về bị lỗi.")
+                }
+                if (configFile.exists()) configFile.delete()
+                if (!configTmp.renameTo(configFile)) {
+                    configTmp.copyTo(configFile, overwrite = true)
+                    configTmp.delete()
+                }
             }
-            // Prefer this voice so playback switches to Piper ONNX automatically.
+
+            for ((name, url) in pack.companionDownloadUrls) {
+                val companion = File(modelFile.parentFile, name)
+                val companionTmp = File(companion.parentFile, "${companion.name}.part")
+                temps += companionTmp
+                downloadToFile(url, companionTmp)
+                if (companionTmp.length() < 4L) {
+                    error("File $name tải về bị lỗi.")
+                }
+                if (companion.exists()) companion.delete()
+                if (!companionTmp.renameTo(companion)) {
+                    companionTmp.copyTo(companion, overwrite = true)
+                    companionTmp.delete()
+                }
+            }
+
+            if (!TtsModelReadiness.isOnnxReady(modelFile)) {
+                error("Gói ${pack.displayName} tải xong nhưng thiếu file đi kèm (tokens/lexicon).")
+            }
             voiceRepository.seedPresetsIfEmpty()
             voiceRepository.setDefault(pack.id)
         } catch (e: Exception) {
-            modelTmp.delete()
-            configTmp.delete()
+            temps.forEach { it.delete() }
             throw e
+        }
+    }
+
+    private suspend fun downloadSherpaTarball(pack: PiperVoicePack) {
+        val url = pack.sherpaTarballUrl ?: error("Thiếu URL tarball Sherpa.")
+        val modelFile = File(context.filesDir, pack.modelAssetPath)
+        val destRoot = modelFile.parentFile ?: error("Thiếu thư mục đích.")
+        destRoot.mkdirs()
+        val tarTmp = File(destRoot.parentFile, "${destRoot.name}.tar.bz2.part")
+        try {
+            downloadToFile(url, tarTmp)
+            if (tarTmp.length() < 1024L) {
+                error("Gói Sherpa tải về bị lỗi (quá nhỏ).")
+            }
+            if (destRoot.exists()) destRoot.deleteRecursively()
+            destRoot.mkdirs()
+            SherpaTarballExtractor.extract(tarTmp, destRoot)
+            if (!TtsModelReadiness.isOnnxReady(modelFile)) {
+                error("Giải nén xong nhưng thiếu file model/token cho ${pack.displayName}.")
+            }
+            voiceRepository.seedPresetsIfEmpty()
+            voiceRepository.setDefault(pack.id)
+        } finally {
+            tarTmp.delete()
         }
     }
 
@@ -254,22 +317,34 @@ class ResourcePackManagerImpl @Inject constructor(
 
     override suspend fun downloadMlKitLanguage(languageCode: String, requireWifi: Boolean) =
         withContext(Dispatchers.IO) {
-            val model = TranslateRemoteModel.Builder(languageCode).build()
-            val conditions = if (requireWifi) {
-                DownloadConditions.Builder().requireWifi().build()
-            } else {
-                DownloadConditions.Builder().build()
-            }
-            suspendCancellableCoroutine { cont ->
-                modelManager.download(model, conditions)
-                    .addOnSuccessListener {
-                        if (cont.isActive) cont.resume(Unit)
-                    }
-                    .addOnFailureListener { error ->
-                        if (cont.isActive) cont.resumeWithException(error)
-                    }
+            downloadOneMlKitModel(languageCode, requireWifi)
+            // ML Kit pairs are bidirectional once both models exist. Always keep Vietnamese
+            // on device so en/ja/ko/zh/fr ↔ vi works immediately after any pack download.
+            val requested = languageCode.trim().lowercase()
+            if (requested != TranslateLanguage.VIETNAMESE &&
+                !isLanguageDownloaded(TranslateLanguage.VIETNAMESE)
+            ) {
+                downloadOneMlKitModel(TranslateLanguage.VIETNAMESE, requireWifi)
             }
         }
+
+    private suspend fun downloadOneMlKitModel(languageCode: String, requireWifi: Boolean) {
+        val model = TranslateRemoteModel.Builder(languageCode).build()
+        val conditions = if (requireWifi) {
+            DownloadConditions.Builder().requireWifi().build()
+        } else {
+            DownloadConditions.Builder().build()
+        }
+        suspendCancellableCoroutine { cont ->
+            modelManager.download(model, conditions)
+                .addOnSuccessListener {
+                    if (cont.isActive) cont.resume(Unit)
+                }
+                .addOnFailureListener { error ->
+                    if (cont.isActive) cont.resumeWithException(error)
+                }
+        }
+    }
 
     override suspend fun deleteMlKitLanguage(languageCode: String) =
         withContext(Dispatchers.IO) {
@@ -287,5 +362,8 @@ class ResourcePackManagerImpl @Inject constructor(
     companion object {
         private const val HF_BASE =
             "https://huggingface.co/rhasspy/piper-voices/resolve/main"
+        private const val SHERPA_RELEASE =
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models"
+        private const val MIN_PIPER_ONNX_BYTES = 512L * 1024L
     }
 }

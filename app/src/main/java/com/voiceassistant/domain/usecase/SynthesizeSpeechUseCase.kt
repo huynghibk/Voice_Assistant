@@ -1,6 +1,7 @@
 package com.voiceassistant.domain.usecase
 
 import com.voiceassistant.domain.model.VoiceModel
+import com.voiceassistant.engine.audio.PlaybackPcm
 import com.voiceassistant.engine.audio.PcmStreamPlayer
 import com.voiceassistant.engine.tts.PcmChunk
 import com.voiceassistant.engine.tts.PiperTtsEngine
@@ -31,17 +32,14 @@ class SynthesizeSpeechUseCase @Inject constructor(
         val collected = ArrayList<Short>()
 
         return piperTtsEngine.synthesizeStreaming(text, voice)
-            .map { chunk ->
+            .onEach { chunk ->
                 val converted = voiceConversionEngine.convert(
-                    basePcm = chunk.pcm16le,
+                    basePcm = chunk.pcmFloat,
                     sampleRateHz = chunk.sampleRateHz,
                     embeddingFile = embedding
                 )
-                chunk.copy(pcm16le = converted.pcm16le)
-            }
-            .onEach { chunk ->
-                pcmStreamPlayer.playChunk(chunk.pcm16le, chunk.sampleRateHz)
-                collected.addAll(chunk.pcm16le.toList())
+                PlaybackPcm.play(pcmStreamPlayer, converted)
+                collected.addAll(PlaybackPcm.toExportPcm16(converted).toList())
             }
             .map { chunk ->
                 Progress(chunk = chunk, collectedPcm = collected.toShortArray())

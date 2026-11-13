@@ -63,12 +63,13 @@ class ModelManagerViewModel @Inject constructor(
 
     fun downloadPiper(packId: String) {
         viewModelScope.launch {
-            val name = _uiState.value.piperPacks.firstOrNull { it.id == packId }?.displayName
-                ?: packId
+            val pack = _uiState.value.piperPacks.firstOrNull { it.id == packId }
+            val name = pack?.displayName ?: packId
+            val sizeMb = pack?.estimatedSizeMb ?: 63
             _uiState.update {
                 it.copy(
                     busyPackId = packId,
-                    statusMessage = "Đang tải giọng $name (~63MB)…"
+                    statusMessage = "Đang tải giọng $name (~${sizeMb}MB)…"
                 )
             }
             runCatching {

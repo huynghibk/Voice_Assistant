@@ -48,77 +48,139 @@ class AndroidSystemTtsSynthesizer @Inject constructor(
                 ensurePreferredEngineLocked(GOOGLE_TTS_PACKAGE)
             }
             val engine = ensureEngineLocked()
+            configureEngineLocked(engine, localeHint, speechRate)
 
-            // Route audio strictly to USAGE_MEDIA / STREAM_MUSIC (never VOICE_COMMUNICATION).
-            val audioAttributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .setLegacyStreamType(AudioManager.STREAM_MUSIC)
-                .build()
-            runCatching { engine.setAudioAttributes(audioAttributes) }
-
-            val locale = if (isVietnamese) {
-                Locale.forLanguageTag("vi-VN")
-            } else {
-                pickLocale(engine, localeHint)
-            }
-
-            // Vietnamese: force vi-VN. Missing pack → notify + open TTS data installer.
-            val setLangResult = runCatching { engine.setLanguage(locale) }
-                .getOrDefault(TextToSpeech.LANG_NOT_SUPPORTED)
-            if (isVietnamese &&
-                (setLangResult == TextToSpeech.LANG_MISSING_DATA ||
-                    setLangResult == TextToSpeech.LANG_NOT_SUPPORTED)
-            ) {
-                openInstallTtsData()
-                error(
-                    "Thiếu gói dữ liệu giọng đọc tiếng Việt. " +
-                        "Vui lòng cài đặt gói giọng Google Tiếng Việt trong màn hình vừa mở để đọc tự nhiên."
-                )
-            }
-
-            // Prefer natural (network) Vietnamese / matching voice over robotic default.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                runCatching {
-                    val matchingVoices = engine.voices
-                        ?.filter { it.locale.language.equals(locale.language, ignoreCase = true) }
-                        .orEmpty()
-                    val naturalVoice = matchingVoices.firstOrNull {
-                        it.name.contains("network", ignoreCase = true) &&
-                            !it.isNetworkConnectionRequired
-                    } ?: matchingVoices.firstOrNull {
-                        it.name.contains("network", ignoreCase = true)
-                    } ?: matchingVoices.firstOrNull {
-                        it.locale.country.equals(locale.country, ignoreCase = true) &&
-                            !it.features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)
-                    } ?: matchingVoices.firstOrNull {
-                        it.locale.country.equals(locale.country, ignoreCase = true)
-                    } ?: matchingVoices.firstOrNull()
-                    if (naturalVoice != null) {
-                        engine.voice = naturalVoice
-                    }
-                }
-            }
-
-            // Keep pitch 1.0; rate changes tempo without chipmunk pitch bend.
-            engine.setSpeechRate(speechRate.coerceIn(0.5f, 2.5f))
-            engine.setPitch(1.0f)
-
+            // Prefer file synth for AudioTrack path; timeout → direct speak() (OPPO-safe).
             val outFile = File(context.cacheDir, "sys_tts_${UUID.randomUUID()}.wav")
-            try {
-                synthesizeToFileLocked(engine, sentence, outFile)
-                if (!outFile.exists() || outFile.length() < 44L) {
-                    error("TTS hệ thống không tạo được file âm thanh.")
+            val pcm = try {
+                val ok = withTimeoutOrNull(SYNTH_TIMEOUT_MS) {
+                    synthesizeToFileLocked(engine, sentence, outFile)
+                    true
                 }
-                readWavPcm16(outFile)
+                if (ok == true && outFile.exists() && outFile.length() >= 44L) {
+                    readWavPcm16(outFile)
+                } else {
+                    null
+                }
             } finally {
                 outFile.delete()
+            }
+
+            if (pcm != null) return@withLock pcm
+
+            // Direct speak() — plays through USAGE_MEDIA immediately.
+            speakLocked(engine, sentence)
+            // Empty PCM: LocalPlaybackController skips AudioTrack (already audible).
+            ShortArray(0) to 22_050
+        }
+
+    /**
+     * Speak via system TTS engine audio path (USAGE_MEDIA). Used when file synth hangs
+     * or as an explicit fallback. Returns after utterance ends or timeout.
+     */
+    suspend fun speak(
+        sentence: String,
+        localeHint: Locale,
+        speechRate: Float = 1.0f
+    ): Boolean =
+        mutex.withLock {
+            val isVietnamese = localeHint.language.equals("vi", ignoreCase = true)
+            if (isVietnamese) {
+                ensurePreferredEngineLocked(GOOGLE_TTS_PACKAGE)
+            }
+            val engine = ensureEngineLocked()
+            configureEngineLocked(engine, localeHint, speechRate)
+            speakLocked(engine, sentence)
+            true
+        }
+
+    private fun configureEngineLocked(
+        engine: TextToSpeech,
+        localeHint: Locale,
+        speechRate: Float
+    ) {
+        val isVietnamese = localeHint.language.equals("vi", ignoreCase = true)
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .setLegacyStreamType(AudioManager.STREAM_MUSIC)
+            .build()
+        runCatching { engine.setAudioAttributes(audioAttributes) }
+
+        val locale = if (isVietnamese) {
+            Locale.forLanguageTag("vi-VN")
+        } else {
+            pickLocale(engine, localeHint)
+        }
+        val setLangResult = runCatching { engine.setLanguage(locale) }
+            .getOrDefault(TextToSpeech.LANG_NOT_SUPPORTED)
+        if (isVietnamese &&
+            (setLangResult == TextToSpeech.LANG_MISSING_DATA ||
+                setLangResult == TextToSpeech.LANG_NOT_SUPPORTED)
+        ) {
+            openInstallTtsData()
+            error(
+                "Thiếu gói dữ liệu giọng đọc tiếng Việt. " +
+                    "Vui lòng cài đặt gói giọng Google Tiếng Việt trong màn hình vừa mở."
+            )
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            runCatching {
+                val matchingVoices = engine.voices
+                    ?.filter { it.locale.language.equals(locale.language, ignoreCase = true) }
+                    .orEmpty()
+                val naturalVoice = matchingVoices.firstOrNull {
+                    it.name.contains("network", ignoreCase = true)
+                } ?: matchingVoices.firstOrNull {
+                    it.locale.country.equals(locale.country, ignoreCase = true)
+                } ?: matchingVoices.firstOrNull()
+                if (naturalVoice != null) engine.voice = naturalVoice
+            }
+        }
+        engine.setSpeechRate(speechRate.coerceIn(0.5f, 2.5f))
+        engine.setPitch(1.0f)
+    }
+
+    private suspend fun speakLocked(engine: TextToSpeech, sentence: String) =
+        withContext(Dispatchers.Main) {
+            withTimeoutOrNull(SPEAK_TIMEOUT_MS) {
+                suspendCancellableCoroutine { cont ->
+                    val utteranceId = "speak_${UUID.randomUUID()}"
+                    engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) = Unit
+                        override fun onDone(utteranceId: String?) {
+                            if (cont.isActive) cont.resume(Unit)
+                        }
+                        @Deprecated("Deprecated in Java")
+                        override fun onError(utteranceId: String?) {
+                            if (cont.isActive) cont.resume(Unit)
+                        }
+                        override fun onError(utteranceId: String?, errorCode: Int) {
+                            if (cont.isActive) cont.resume(Unit)
+                        }
+                    })
+                    cont.invokeOnCancellation { runCatching { engine.stop() } }
+                    val params = Bundle()
+                    val result = engine.speak(sentence, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+                    if (result != TextToSpeech.SUCCESS && cont.isActive) {
+                        cont.resumeWithException(
+                            IllegalStateException("Không thể phát bằng giọng hệ thống.")
+                        )
+                    }
+                }
+            } ?: run {
+                runCatching { engine.stop() }
+                Unit
             }
         }
 
     // Pre-create the engine on Main so the first Play is faster / more reliable.
     suspend fun warmUp() {
         mutex.withLock { ensureEngineLocked() }
+    }
+
+    fun stopSpeaking() {
+        runCatching { tts?.stop() }
     }
 
     fun shutdown() {
@@ -330,11 +392,14 @@ class AndroidSystemTtsSynthesizer @Inject constructor(
 
     companion object {
         private const val GOOGLE_TTS_PACKAGE = "com.google.android.tts"
+        const val SYNTH_TIMEOUT_MS = 4_000L
+        private const val SPEAK_TIMEOUT_MS = 60_000L
 
         fun localeForVoiceId(voiceId: String?, voiceName: String?): Locale {
             val key = "${voiceId.orEmpty()} ${voiceName.orEmpty()}".lowercase(Locale.ROOT)
             return when {
                 "vi" in key || "vietnam" in key || "việt" in key -> Locale.forLanguageTag("vi-VN")
+                "zh" in key || "chinese" in key || "melo" in key -> Locale.forLanguageTag("zh-CN")
                 "en" in key || "amy" in key || "ryan" in key -> Locale.US
                 else -> Locale.US
             }

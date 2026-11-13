@@ -17,6 +17,9 @@ class TranslationRepositoryImpl @Inject constructor(
     private val networkMonitor: NetworkMonitor
 ) : TranslationRepository {
 
+    override fun supportsOnlineAi(): Boolean =
+        networkMonitor.isOnline() && geminiOnlineEngine.hasApiKey()
+
     override suspend fun translate(
         text: String,
         sourceLang: String,
@@ -26,12 +29,15 @@ class TranslationRepositoryImpl @Inject constructor(
 
         if (networkMonitor.isOnline()) {
             val online = geminiOnlineEngine.translate(text, sourceLang, targetLang)
-            if (online.isSuccess) return online
-            // Fall through to offline on any Gemini error (quota, missing key, …)
+            if (online.isSuccess) {
+                return online.map { TranslationCasePreserver.restoreCasing(text, it) }
+            }
         }
 
         val offline = mlKitOfflineEngine.translate(text, sourceLang, targetLang)
-        if (offline.isSuccess) return offline
+        if (offline.isSuccess) {
+            return offline.map { TranslationCasePreserver.restoreCasing(text, it) }
+        }
 
         return Result.failure(
             offline.exceptionOrNull()

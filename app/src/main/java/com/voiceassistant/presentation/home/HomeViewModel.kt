@@ -3,12 +3,18 @@ package com.voiceassistant.presentation.home
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.voiceassistant.R
 import com.voiceassistant.data.prefs.OnboardingPreferences
 import com.voiceassistant.domain.model.VoiceModel
 import com.voiceassistant.domain.playback.PlaybackController
+import com.voiceassistant.domain.repository.TranslationRepository
 import com.voiceassistant.domain.repository.VoiceRepository
+import com.voiceassistant.data.translation.OfflineTranslationService
+import com.voiceassistant.domain.translation.LanguageIdentifier
+import com.voiceassistant.engine.translation.LanguageCodes
 import com.voiceassistant.domain.resource.ResourcePackManager
 import com.voiceassistant.domain.resource.TtsResourceGuard
+import com.voiceassistant.domain.voice.ClonedVoiceSupport
 import com.voiceassistant.engine.audio.AudioExportEngine
 import com.voiceassistant.engine.audio.AudioRoutingManager
 import com.voiceassistant.engine.audio.ExportFormat
@@ -32,13 +38,22 @@ import java.io.File
 import java.util.Locale
 import javax.inject.Inject
 
+enum class HomeReadMode {
+    ORIGINAL,
+    TRANSLATE_AND_READ
+}
+
 data class HomeUiState(
     val text: String = "",
     val voices: List<VoiceModel> = emptyList(),
+    /** voiceId → true when Piper .onnx exists under filesDir/models/piper/ */
+    val piperReadyByVoiceId: Map<String, Boolean> = emptyMap(),
     val selectedVoiceId: String? = null,
     val isPlaying: Boolean = false,
     val isPaused: Boolean = false,
     val isListening: Boolean = false,
+    /** UI should launch the system speech screen. */
+    val pendingSpeechIntent: Boolean = false,
     val progressLabel: String = "",
     val statusMessage: String = "",
     val lastExportPath: String? = null,
@@ -51,9 +66,15 @@ data class HomeUiState(
     val onboardingPiperReady: Boolean = false,
     val onboardingMlKitReady: Boolean = false,
     val onboardingDownloading: Boolean = false,
+    val onboardingDownloadingMessage: String = "",
     val playbackSpeed: Float = 1.0f,
     val karaokeSentences: List<String> = emptyList(),
-    val karaokeIndex: Int = -1
+    val karaokeIndex: Int = -1,
+    val readMode: HomeReadMode = HomeReadMode.ORIGINAL,
+    val translateLanguages: List<OfflineTranslationService.Lang> = emptyList(),
+    val selectedTargetLang: String = "vi",
+    val translatedText: String = "",
+    val isTranslating: Boolean = false
 )
 
 @HiltViewModel
@@ -69,17 +90,23 @@ class HomeViewModel @Inject constructor(
     private val speechToTextEngine: SpeechToTextEngine,
     private val ttsResourceGuard: TtsResourceGuard,
     private val resourcePackManager: ResourcePackManager,
-    private val onboardingPreferences: OnboardingPreferences
+    private val onboardingPreferences: OnboardingPreferences,
+    private val translationRepository: TranslationRepository,
+    private val languageIdentifier: LanguageIdentifier,
+    private val offlineTranslationService: OfflineTranslationService
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(HomeUiState())
+    private val _uiState = MutableStateFlow(
+        HomeUiState(translateLanguages = offlineTranslationService.supported)
+    )
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    private var listenJob: Job? = null
     private var lastPcm: ShortArray = shortArrayOf()
     private var lastSampleRate: Int = 22_050
     private var lastExportFile: File? = null
     private var textBeforeListen: String = ""
+    private var speechLocale: Locale = Locale.getDefault()
+    private var listenJob: Job? = null
     private var lastSeenDefaultVoiceId: String? = null
 
     val speedPresets: List<Float> = listOf(0.8f, 1.0f, 1.2f, 1.5f, 2.0f)
@@ -91,6 +118,19 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             voiceRepository.seedPresetsIfEmpty()
             voiceRepository.observeVoices().collect { voices ->
+                val mmsId = "preset_vi_demo"
+                val piperViId = "preset_vi_piper_25h"
+                val defaultVoice = voices.firstOrNull { it.isDefault }
+                if (defaultVoice?.id == mmsId &&
+                    !resourcePackManager.isPiperPathReady(defaultVoice.modelAssetPath) &&
+                    voices.any { it.id == piperViId } &&
+                    resourcePackManager.isPiperPathReady(
+                        voices.first { it.id == piperViId }.modelAssetPath
+                    )
+                ) {
+                    voiceRepository.setDefault(piperViId)
+                    return@collect
+                }
                 val current = _uiState.value.selectedVoiceId
                 val defaultId = voices.firstOrNull { it.isDefault }?.id
                 val defaultChanged =
@@ -104,7 +144,16 @@ class HomeViewModel @Inject constructor(
                     current != null && voices.any { it.id == current } -> current
                     else -> defaultId ?: voices.firstOrNull()?.id
                 }
-                _uiState.update { it.copy(voices = voices, selectedVoiceId = selected) }
+                val piperReady = voices.associate { v ->
+                    v.id to ClonedVoiceSupport.basePiperReady(v, voices, resourcePackManager)
+                }
+                _uiState.update {
+                    it.copy(
+                        voices = voices,
+                        selectedVoiceId = selected,
+                        piperReadyByVoiceId = piperReady
+                    )
+                }
             }
         }
         viewModelScope.launch {
@@ -125,12 +174,18 @@ class HomeViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            var lastPlaybackSentence = -1
             playbackController.state.collect { playback ->
-                if (playback.isPlaying) {
+                val idx = playback.currentSentenceIndex
+                if (playback.isPlaying && idx >= 0 && idx != lastPlaybackSentence) {
+                    lastPlaybackSentence = idx
                     lastPcm = playbackController.getCollectedPcm()
                     lastSampleRate = playbackController.getSampleRate()
+                } else if (!playback.isPlaying && lastPlaybackSentence >= 0) {
+                    lastPcm = playbackController.getCollectedPcm()
+                    lastSampleRate = playbackController.getSampleRate()
+                    lastPlaybackSentence = -1
                 }
-                val idx = playback.currentSentenceIndex
                 _uiState.update {
                     it.copy(
                         isPlaying = playback.isPlaying,
@@ -178,7 +233,12 @@ class HomeViewModel @Inject constructor(
 
     fun downloadStarterMlKit() {
         viewModelScope.launch {
-            _uiState.update { it.copy(onboardingDownloading = true) }
+            _uiState.update {
+                it.copy(
+                    onboardingDownloading = true,
+                    onboardingDownloadingMessage = "Đang tải gói dịch EN–VI…"
+                )
+            }
             runCatching {
                 resourcePackManager.downloadMlKitLanguage("en", requireWifi = false)
                 resourcePackManager.downloadMlKitLanguage("vi", requireWifi = false)
@@ -186,6 +246,7 @@ class HomeViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         onboardingDownloading = false,
+                        onboardingDownloadingMessage = "",
                         onboardingMlKitReady = true,
                         statusMessage = "Đã tải gói dịch EN–VI."
                     )
@@ -194,7 +255,46 @@ class HomeViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         onboardingDownloading = false,
+                        onboardingDownloadingMessage = "",
                         statusMessage = e.message ?: "Tải gói dịch thất bại. Vui lòng kiểm tra kết nối mạng."
+                    )
+                }
+            }
+        }
+    }
+
+    fun downloadStarterPiper() {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    onboardingDownloading = true,
+                    onboardingDownloadingMessage = "Đang tải gói giọng đọc Piper…"
+                )
+            }
+            runCatching {
+                resourcePackManager.downloadPiperVoice("preset_vi_demo")
+                resourcePackManager.downloadPiperVoice("preset_en_amy")
+            }.onSuccess {
+                val ready = resourcePackManager.anyPiperReady()
+                val catalog = _uiState.value.voices
+                val updatedPiperMap = catalog.associate { v ->
+                    v.id to ClonedVoiceSupport.basePiperReady(v, catalog, resourcePackManager)
+                }
+                _uiState.update {
+                    it.copy(
+                        onboardingDownloading = false,
+                        onboardingDownloadingMessage = "",
+                        onboardingPiperReady = ready,
+                        piperReadyByVoiceId = updatedPiperMap,
+                        statusMessage = "Đã tải gói giọng đọc Piper."
+                    )
+                }
+            }.onFailure { e ->
+                _uiState.update {
+                    it.copy(
+                        onboardingDownloading = false,
+                        onboardingDownloadingMessage = "",
+                        statusMessage = e.message ?: "Tải gói giọng đọc Piper thất bại. Vui lòng kiểm tra kết nối mạng."
                     )
                 }
             }
@@ -228,6 +328,17 @@ class HomeViewModel @Inject constructor(
         _uiState.update { it.copy(selectedVoiceId = id) }
     }
 
+    fun onReadModeSelected(mode: HomeReadMode) {
+        _uiState.update {
+            it.copy(
+                readMode = mode,
+                translatedText = if (mode == HomeReadMode.ORIGINAL) "" else it.translatedText
+            )
+        }
+    }
+
+    fun onTargetLang(id: String) = _uiState.update { it.copy(selectedTargetLang = id) }
+
     fun onExportFormat(format: ExportFormat) {
         _uiState.update { it.copy(exportFormat = format) }
     }
@@ -246,65 +357,137 @@ class HomeViewModel @Inject constructor(
 
     fun startListening() {
         if (_uiState.value.isPlaying) stop()
+        listenJob?.cancel()
+        listenJob = null
+        val state = _uiState.value
+        val voice = state.voices.firstOrNull { it.id == state.selectedVoiceId }
+        speechLocale = AndroidSystemTtsSynthesizer.localeForVoiceId(voice?.id, voice?.name)
+        textBeforeListen = state.text
+        if (speechToTextEngine.hasGoogleSpeech()) {
+            requestSystemSpeechIntent(appContext.getString(R.string.home_mic_opening))
+        } else {
+            startDeviceListening()
+        }
+    }
+
+    fun createSpeechIntent(): android.content.Intent =
+        speechToTextEngine.createRecognizeIntent(speechLocale)
+
+    private fun startDeviceListening() {
         if (!speechToTextEngine.isAvailable()) {
             _uiState.update {
-                it.copy(statusMessage = "Thiết bị không hỗ trợ nhận dạng giọng nói.")
+                it.copy(
+                    isListening = false,
+                    pendingSpeechIntent = false,
+                    statusMessage = appContext.getString(R.string.home_mic_no_engine)
+                )
             }
             return
         }
-        listenJob?.cancel()
-        textBeforeListen = _uiState.value.text
         _uiState.update {
-            it.copy(isListening = true, statusMessage = "Đang nghe… hãy nói.")
+            it.copy(
+                isListening = true,
+                pendingSpeechIntent = false,
+                statusMessage = appContext.getString(R.string.home_mic_device)
+            )
         }
         listenJob = viewModelScope.launch {
-            speechToTextEngine.listen(Locale.getDefault()).collect { event ->
+            speechToTextEngine.listen(speechLocale).collect { event ->
                 when (event) {
                     SpeechEvent.Ready,
                     SpeechEvent.BeginningOfSpeech -> {
-                        _uiState.update { it.copy(statusMessage = "Đang nghe…") }
+                        _uiState.update {
+                            it.copy(statusMessage = appContext.getString(R.string.home_mic_device))
+                        }
                     }
                     is SpeechEvent.Partial -> {
-                        val merged = mergeTranscript(textBeforeListen, event.text)
                         _uiState.update {
-                            it.copy(text = merged, statusMessage = "Đang nghe…")
+                            it.copy(
+                                text = mergeTranscript(textBeforeListen, event.text),
+                                statusMessage = appContext.getString(R.string.home_mic_device)
+                            )
                         }
                     }
                     is SpeechEvent.Final -> {
-                        val merged = mergeTranscript(textBeforeListen, event.text)
                         _uiState.update {
                             it.copy(
-                                text = merged,
+                                text = mergeTranscript(textBeforeListen, event.text),
                                 isListening = false,
-                                statusMessage = "Đã chuyển giọng nói thành văn bản."
+                                statusMessage = appContext.getString(R.string.home_mic_done)
                             )
                         }
                     }
-                    is SpeechEvent.Error -> {
+                    is SpeechEvent.Error,
+                    is SpeechEvent.NeedsIntentFallback -> {
+                        val message = when (event) {
+                            is SpeechEvent.Error -> event.message
+                            is SpeechEvent.NeedsIntentFallback -> event.message
+                            else -> appContext.getString(R.string.home_mic_no_engine)
+                        }
                         _uiState.update {
-                            it.copy(
-                                isListening = false,
-                                statusMessage = event.message
-                            )
+                            it.copy(isListening = false, statusMessage = message)
                         }
                     }
                     SpeechEvent.End -> {
-                        _uiState.update { state ->
-                            if (state.isListening) {
-                                state.copy(
-                                    isListening = false,
-                                    statusMessage = if (state.text != textBeforeListen) {
-                                        "Đã chuyển giọng nói thành văn bản."
-                                    } else {
-                                        state.statusMessage.ifBlank { "Đã dừng ghi âm." }
-                                    }
-                                )
-                            } else state
+                        _uiState.update { current ->
+                            if (!current.isListening) current
+                            else current.copy(
+                                isListening = false,
+                                statusMessage = if (current.text != textBeforeListen) {
+                                    appContext.getString(R.string.home_mic_done)
+                                } else {
+                                    current.statusMessage
+                                }
+                            )
                         }
                     }
                 }
             }
-            _uiState.update { it.copy(isListening = false) }
+            _uiState.update { if (it.isListening) it.copy(isListening = false) else it }
+        }
+    }
+
+    fun onSpeechIntentConsumed() {
+        _uiState.update { it.copy(pendingSpeechIntent = false) }
+    }
+
+    fun onSpeechIntentLaunchFailed() {
+        _uiState.update {
+            it.copy(
+                isListening = false,
+                pendingSpeechIntent = false,
+                statusMessage = appContext.getString(R.string.home_mic_unavailable)
+            )
+        }
+    }
+
+    fun onSpeechIntentResult(data: android.content.Intent?) {
+        val spoken = speechToTextEngine.parseRecognizeResult(data)
+        _uiState.update { state ->
+            if (spoken.isNullOrBlank()) {
+                state.copy(
+                    isListening = false,
+                    pendingSpeechIntent = false,
+                    statusMessage = "Không nhận được lời nói. Thử lại."
+                )
+            } else {
+                state.copy(
+                    text = mergeTranscript(state.text, spoken),
+                    isListening = false,
+                    pendingSpeechIntent = false,
+                    statusMessage = "Đã chuyển giọng nói thành văn bản."
+                )
+            }
+        }
+    }
+
+    private fun requestSystemSpeechIntent(message: String) {
+        _uiState.update {
+            it.copy(
+                isListening = true,
+                pendingSpeechIntent = true,
+                statusMessage = message
+            )
         }
     }
 
@@ -314,6 +497,7 @@ class HomeViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 isListening = false,
+                pendingSpeechIntent = false,
                 statusMessage = if (it.text != textBeforeListen) {
                     "Đã chuyển giọng nói thành văn bản."
                 } else {
@@ -347,18 +531,68 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             val advice = ttsResourceGuard.advisePlay(voice)
             val suppress = onboardingPreferences.suppressSystemTtsDialog.first()
+            val textToSpeak = when (state.readMode) {
+                HomeReadMode.ORIGINAL -> {
+                    _uiState.update { it.copy(translatedText = "", isTranslating = false) }
+                    text
+                }
+                HomeReadMode.TRANSLATE_AND_READ -> resolveTextForTranslateAndRead(text, state.selectedTargetLang)
+            }
+            if (textToSpeak.isBlank()) return@launch
+
             _uiState.update {
                 it.copy(
-                    statusMessage = advice.message ?: "Đang tổng hợp…",
+                    isPlaying = true,
+                    statusMessage = "Đang phát…",
                     showSystemTtsDialog = if (suppress) false else advice.suggestOpenModelManager
                 )
             }
             // Clear STT/SCO earpiece routing before TTS media playback.
             audioRoutingManager.ensureMediaMode()
             playbackController.setSpeed(state.playbackSpeed)
-            playbackController.start(text, voice, title = voice.name)
             TtsPlaybackStarter.start(appContext)
+            playbackController.start(textToSpeak, voice, title = voice.name)
         }
+    }
+
+    private suspend fun resolveTextForTranslateAndRead(
+        source: String,
+        targetLang: String
+    ): String {
+        _uiState.update {
+            it.copy(isTranslating = true, statusMessage = "Đang nhận diện ngôn ngữ…")
+        }
+        val detected = languageIdentifier.identify(source)
+        val targetLabel = LanguageCodes.nativeLabel(targetLang)
+        _uiState.update {
+            it.copy(statusMessage = "Đang dịch sang $targetLabel…")
+        }
+        return translationRepository.translate(
+            text = source,
+            sourceLang = detected,
+            targetLang = targetLang
+        ).fold(
+            onSuccess = { translated ->
+                _uiState.update {
+                    it.copy(
+                        isTranslating = false,
+                        translatedText = translated,
+                        statusMessage = "Sẵn sàng phát bản dịch."
+                    )
+                }
+                translated
+            },
+            onFailure = { e ->
+                _uiState.update {
+                    it.copy(
+                        isTranslating = false,
+                        translatedText = "",
+                        statusMessage = e.message ?: "Dịch thất bại — phát bản gốc."
+                    )
+                }
+                source
+            }
+        )
     }
 
     fun stop() {

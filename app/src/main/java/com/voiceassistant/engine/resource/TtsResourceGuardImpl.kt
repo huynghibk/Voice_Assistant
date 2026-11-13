@@ -1,25 +1,34 @@
 package com.voiceassistant.engine.resource
 
 import com.voiceassistant.domain.model.VoiceModel
+import com.voiceassistant.domain.repository.VoiceRepository
 import com.voiceassistant.domain.resource.ResourcePackManager
 import com.voiceassistant.domain.resource.TtsResourceGuard
+import com.voiceassistant.domain.voice.ClonedVoiceSupport
 import com.voiceassistant.engine.translation.LanguageCodes
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class TtsResourceGuardImpl @Inject constructor(
-    private val resourcePackManager: ResourcePackManager
+    private val resourcePackManager: ResourcePackManager,
+    private val voiceRepository: VoiceRepository
 ) : TtsResourceGuard {
 
     override suspend fun advisePlay(voice: VoiceModel): TtsResourceGuard.PlayAdvice {
-        val ready = resourcePackManager.isPiperPathReady(voice.modelAssetPath)
+        val catalog = voiceRepository.listVoices()
+        val ready = ClonedVoiceSupport.basePiperReady(voice, catalog, resourcePackManager)
         return if (ready) {
             TtsResourceGuard.PlayAdvice(usingSystemTts = false)
         } else {
+            val message = if (ClonedVoiceSupport.isUserClone(voice)) {
+                "Cần tải gói Piper (Tiếng Việt hoặc English) để đọc bằng giọng clone."
+            } else {
+                "Chưa có gói Piper — đang dùng giọng hệ thống."
+            }
             TtsResourceGuard.PlayAdvice(
                 usingSystemTts = true,
-                message = "Chưa có gói Piper — đang dùng giọng hệ thống.",
+                message = message,
                 suggestOpenModelManager = true
             )
         }

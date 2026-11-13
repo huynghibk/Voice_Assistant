@@ -13,13 +13,32 @@
     <string name="home_subtitle">貼上文字，立即收聽</string>
     <string name="home_voices">朗讀音色</string>
     <string name="home_voice_preset">內建</string>
+    <string name="home_voice_piper_ready">Piper AI · 已下載</string>
+    <string name="home_voice_system_fallback">未下載 · 系統語音</string>
     <string name="home_voice_saved">已儲存</string>
+    <string name="translate_source_box">原文</string>
+    <string name="translate_result_box">譯文</string>
+    <string name="translate_paste">貼上</string>
+    <string name="translate_clear">清除</string>
+    <string name="translate_listen">朗讀譯文</string>
+    <string name="translate_copy">複製</string>
+    <string name="translate_mic">麥克風</string>
+    <string name="translate_result_placeholder">譯文顯示在這裡…</string>
+    <string name="translate_copied">已複製。</string>
+    <string name="translate_status_done_ai">已翻譯（AI）。</string>
+    <string name="translate_status_done_offline">已翻譯（離線）。請在設定中加入 Gemini API Key 以提升品質。</string>
+    <string name="translate_empty_result">尚無譯文。</string>
     <string name="home_text_hint">輸入或貼上要朗讀的文字…</string>
     <string name="home_export">匯出</string>
     <string name="home_play">播放</string>
     <string name="home_stop">停止</string>
     <string name="home_share">分享</string>
     <string name="home_route_speaker">裝置喇叭</string>
+    <string name="home_mic_opening">正在開啟麥克風…請說話。</string>
+    <string name="home_mic_device">正在用本機麥克風聽…請說話。</string>
+    <string name="home_mic_done">已將語音轉成文字。</string>
+    <string name="home_mic_no_engine">這支手機沒有語音辨識服務。</string>
+    <string name="home_mic_unavailable">無法開啟系統麥克風。請安裝語音辨識後再試。</string>
 
     <string name="settings_title">設定與說明</string>
     <string name="settings_section">設定</string>
@@ -51,6 +70,9 @@
     <string name="settings_gemini_help">從 Google AI Studio 取得免費 Key（點選開啟）</string>
     <string name="settings_gemini_save">儲存 Key</string>
     <string name="settings_gemini_clear">清除</string>
+    <string name="settings_gemini_key_active">目前 Key：%1$s</string>
+    <string name="settings_gemini_key_build">目前 Key 來自 %1$s（開發建置）</string>
+    <string name="settings_gemini_replace_hint">貼上新 Key 以取代已儲存的 Key…</string>
 
     <string name="model_manager_title">下載中心</string>
     <string name="model_manager_subtitle">管理離線語音與翻譯語言套件</string>
@@ -62,6 +84,7 @@
     <string name="model_size_mb">~%1$dMB</string>
     <string name="model_status_ready">已安裝</string>
     <string name="model_status_system_tts">未找到 — 將使用系統語音</string>
+    <string name="model_status_unavailable">尚未提供下載 — 請使用 Tiếng Việt · Piper 25h</string>
     <string name="model_status_installed">已安裝</string>
     <string name="model_status_not_installed">未安裝</string>
     <string name="model_download">下載</string>

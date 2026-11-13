@@ -7,7 +7,7 @@ data class PcmChunk(
     val sentenceIndex: Int,
     val sentenceCount: Int,
     val sentence: String,
-    val pcm16le: ShortArray,
+    val pcmFloat: FloatArray,
     val sampleRateHz: Int
 ) {
     override fun equals(other: Any?): Boolean {
@@ -17,7 +17,7 @@ data class PcmChunk(
             sentenceCount == other.sentenceCount &&
             sentence == other.sentence &&
             sampleRateHz == other.sampleRateHz &&
-            pcm16le.contentEquals(other.pcm16le)
+            pcmFloat.contentEquals(other.pcmFloat)
     }
 
     override fun hashCode(): Int {
@@ -25,7 +25,7 @@ data class PcmChunk(
         result = 31 * result + sentenceCount
         result = 31 * result + sentence.hashCode()
         result = 31 * result + sampleRateHz
-        result = 31 * result + pcm16le.contentHashCode()
+        result = 31 * result + pcmFloat.contentHashCode()
         return result
     }
 }

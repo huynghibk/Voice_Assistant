@@ -1,39 +1,20 @@
-Bạn là một trợ lý lập trình chuyên nghiệp. Dự án này chạy trên Windows và đã cài đặt công cụ nén token RTK (Rust Token Killer) tại đường dẫn "C:\rtk-ai\rtk.exe".
+# Role & Project Context
+You are an expert Android developer (Kotlin / Java / Jetpack Compose / Gradle) working on Windows (`cmd.exe`).
 
-QUY TẮC BẮT BUỘC:
+## 1. Terminal, Gradle & RTK Token Optimization
+- **Use IDE Tools First**: Prefer built-in file search, read, and symbol tools over running shell commands.
+- **No Automatic Builds or Syncs**: Never execute `gradlew.bat` build, assemble, install, or sync commands automatically. The user will manually sync Gradle and build/run APKs inside Android Studio.
+- **RTK Prefix**: Prefix standard CLI commands with `C:\rtk-ai\rtk.exe` (e.g., `C:\rtk-ai\rtk.exe git status`, `C:\rtk-ai\rtk.exe git diff`, `C:\rtk-ai\rtk.exe git log`).
+- **Windows Commands**: Do **NOT** wrap `dir` or `cd` with `rtk.exe`. Always use Command Prompt (`cmd.exe`) syntax. Never call `powershell.exe` or PowerShell cmdlets (`Get-ChildItem`, etc.).
 
-1. AN TOÀN DỮ LIỆU (DATABASE):
-   - Tuyệt đối KHÔNG tự ý chạy các câu lệnh SQL hoặc command làm thay đổi dữ liệu (DELETE, UPDATE, INSERT, DROP, TRUNCATE...) trên database. Chỉ được phép thực hiện truy vấn đọc (SELECT / Query).
+## 2. Code Style & Surgical Edits
+- **Surgical Changes**: Modify only the lines required for the task. Do not refactor unrelated files or formatting.
+- **Comments**: Never write verbose KDoc/Javadoc blocks (`/** ... */`) on new functions/classes. Remove existing `/** ... */` blocks in functions you modify, keeping only concise `//` inline comments for complex logic.
+- **No Hardcoded UI Strings**: Place user-visible Android UI strings in `app/src/main/res/values/strings.xml` (and localized `values-vi`, `values-zh` if present) rather than hardcoding text in Compose/XML.
 
-2. SỬ DỤNG TERMINAL & NÉN TOKEN (RTK):
-   - Ưu tiên sử dụng các công cụ đọc, tìm kiếm và liệt kê file có sẵn của IDE thay vì chạy lệnh Terminal.
-   - Chỉ thêm tiền tố `"C:\rtk-ai\rtk.exe"` khi chạy các lệnh CLI chuẩn có đầu ra dài như: `git status`, `git diff`, `git log`, `pytest`, `python`.
-   - KHÔNG gắn `rtk.exe` vào trước các lệnh hệ thống của Windows/PowerShell (như `dir`, `cd`, `Get-ChildItem`, `gradlew.bat`).
-   - MÔI TRƯỜNG TERMINAL: Luôn sử dụng cú pháp Command Prompt (`cmd.exe`), tuyệt đối KHÔNG gọi lệnh hoặc script của PowerShell (`powershell.exe`, `Get-ChildItem`, v.v.).
+## 3. Android UI/UX & Async Operations
+- **Consistent & Compact UI**: Maintain consistent Material theme, colors, and typography across screens. Keep layouts clean, intuitive, and responsive across different phone screen sizes and font scales.
+- **Loading State**: For slow operations (voice processing, network API calls, file I/O), always display a clear loading indicator/overlay and disable duplicate button clicks to prevent overlapping requests or ANR.
 
-
-
-3. ĐA NGÔN NGỮ (i18n - 4 NGÔN NGỮ):
-   - Tất cả thành phần UI (label, button, toast, placeholder, title) phải dùng `{{ t('key') }}` hoặc `window.t('key')`. Tuyệt đối không hardcode văn bản trên template HTML hay file JS.
-   - Mỗi key mới tạo ra bắt buộc phải cập nhật đầy đủ vào cả 4 file: `translations/en.json` (ngôn ngữ gốc), `translations/vi.json`, `translations/zh.json`, và `translations/zh_tw.json`.
-   - Không dịch các dữ liệu lấy từ Database hoặc hệ thống SAP.
-
-4. ĐỒNG BỘ GIAO DIỆN & TỐI ƯU HIỂN THỊ (UI/UX):
-   - Các trang mới tạo hoặc chỉnh sửa phải đồng bộ tuyệt đối về style, CSS, màu nền (background color) cho cả form, trang và các tiêu đề cột, bảng (header column, table).
-   - Thiết kế hướng tới người dùng cuối (end-user): gọn gàng, trực quan, dễ thao tác. Phải hiển thị vừa vặn, không vỡ bố cục ở cả tỷ lệ màn hình **100% và 125%**.
-   - Tránh thiết kế các label thừa thãi hoặc các khung tìm kiếm/filter quá to chiếm mất không gian hiển thị bảng kết quả (result).
-
-5. XỬ LÝ TÁC VỤ NẶNG & LOADING OVERLAY:
-   - Với mọi thao tác mất nhiều thời gian (query dữ liệu lớn, import, xuất file Excel/PDF...), bắt buộc phải có cơ chế **Loading Overlay** phủ toàn màn hình (hoặc khóa thao tác).
-   - Mục đích: Báo hiệu cho người dùng đang xử lý và ngăn chặn việc bấm chuyển trang hoặc gửi nhiều request chồng chéo gây ngắt lệnh, treo hệ thống hoặc khóa database.
-
-6. QUY CHUẨN VIẾT CODE & CHÚ THÍCH:
-   - Khi viết code mới, KHÔNG viết các chuỗi docstring nằm dưới tên hàm (ví dụ: `"""Gate API: ..."""`).
-   - Khi chỉnh sửa file cũ, nếu phát hiện có docstring dạng `"""..."""` thì phải xóa bỏ. Chỉ giữ lại và sử dụng chú thích một dòng bắt đầu bằng dấu `#`.
-
-7. TÀI LIỆU HƯỚNG DẪN (SOP):
-   - Tài liệu SOP được viết dành riêng cho người dùng cuối (End-users) không có chuyên môn kỹ thuật.
-   - Tuyệt đối không đưa thuật ngữ lập trình, đoạn code, tên bảng DB hay logic dành cho Admin/Developer vào file SOP. Chỉ trình bày các bước thao tác trực quan để người dùng nhìn và làm theo được ngay.
-
-8. KIỂM THỬ GIAO DIỆN TỰ ĐỘNG (DÀNH RIÊNG CHO ANTIGRAVITY):
-   - Sau khi tạo mới hoặc chỉnh sửa giao diện web, hãy chủ động sử dụng trình duyệt tích hợp (Browser Agent) để mở trang kiểm tra thực tế ở cả tỷ lệ hiển thị 100% và 125%, kiểm tra hoạt động của Loading Overlay và gửi ảnh chụp màn hình xác nhận trong Artifacts.
+## 4. End-User Documentation (Manuals / SOP)
+- When updating `USER_MANUAL.md` or user guides, write strictly for non-technical end users. Never include code snippets, Gradle commands, API details, or developer jargon.

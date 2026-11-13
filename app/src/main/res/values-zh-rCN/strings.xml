@@ -13,13 +13,32 @@
     <string name="home_subtitle">粘贴文本，立即收听</string>
     <string name="home_voices">朗读音色</string>
     <string name="home_voice_preset">内置</string>
+    <string name="home_voice_piper_ready">Piper AI · 已下载</string>
+    <string name="home_voice_system_fallback">未下载 · 系统语音</string>
     <string name="home_voice_saved">已保存</string>
+    <string name="translate_source_box">原文</string>
+    <string name="translate_result_box">译文</string>
+    <string name="translate_paste">粘贴</string>
+    <string name="translate_clear">清除</string>
+    <string name="translate_listen">朗读译文</string>
+    <string name="translate_copy">复制</string>
+    <string name="translate_mic">麦克风</string>
+    <string name="translate_result_placeholder">译文显示在这里…</string>
+    <string name="translate_copied">已复制。</string>
+    <string name="translate_status_done_ai">已翻译（AI）。</string>
+    <string name="translate_status_done_offline">已翻译（离线）。请在设置中添加 Gemini API Key 以获得更好效果。</string>
+    <string name="translate_empty_result">尚无译文。</string>
     <string name="home_text_hint">输入或粘贴要朗读的文本…</string>
     <string name="home_export">导出</string>
     <string name="home_play">播放</string>
     <string name="home_stop">停止</string>
     <string name="home_share">分享</string>
     <string name="home_route_speaker">设备扬声器</string>
+    <string name="home_mic_opening">正在打开麦克风…请说话。</string>
+    <string name="home_mic_device">正在用本机麦克风听…请说话。</string>
+    <string name="home_mic_done">已将语音转为文字。</string>
+    <string name="home_mic_no_engine">这台手机没有语音识别服务。</string>
+    <string name="home_mic_unavailable">无法打开系统麦克风。请安装语音识别后再试。</string>
 
     <string name="settings_title">设置与帮助</string>
     <string name="settings_section">设置</string>
@@ -51,6 +70,9 @@
     <string name="settings_gemini_help">从 Google AI Studio 获取免费 Key（点击打开）</string>
     <string name="settings_gemini_save">保存 Key</string>
     <string name="settings_gemini_clear">清除</string>
+    <string name="settings_gemini_key_active">当前 Key：%1$s</string>
+    <string name="settings_gemini_key_build">当前 Key 来自 %1$s（开发构建）</string>
+    <string name="settings_gemini_replace_hint">粘贴新 Key 以替换已保存的 Key…</string>
 
     <string name="model_manager_title">下载中心</string>
     <string name="model_manager_subtitle">管理离线语音与翻译语言包</string>
@@ -62,6 +84,7 @@
     <string name="model_size_mb">~%1$dMB</string>
     <string name="model_status_ready">已安装</string>
     <string name="model_status_system_tts">未找到 — 将使用系统语音</string>
+    <string name="model_status_unavailable">尚未提供下载 — 请使用 Tiếng Việt · Piper 25h</string>
     <string name="model_status_installed">已安装</string>
     <string name="model_status_not_installed">未安装</string>
     <string name="model_download">下载</string>
@@ -86,6 +109,11 @@
     <string name="onboarding_mlkit_need">EN–VI 翻译包：未安装 (~60MB)</string>
     <string name="onboarding_download_en_vi">下载 EN–VI</string>
     <string name="onboarding_downloading_en_vi">正在下载 EN–VI 语言包…</string>
+    <string name="onboarding_download_piper">下载 Piper 语音包 (越南语 / 英语)</string>
+    <string name="onboarding_downloading_piper">正在下载 Piper 语音包…</string>
     <string name="onboarding_skip">稍后再说</string>
     <string name="onboarding_done">完成</string>
+    <string name="error_missing_google_tts_piper">设备缺少 Google TTS，请下载 Piper AI 语音包以收听</string>
+    <string name="error_tts_failed">TTS 失败: %1$s</string>
+    <string name="error_piper_onnx_failed">Piper ONNX 错误: %1$s</string>
 </resources>

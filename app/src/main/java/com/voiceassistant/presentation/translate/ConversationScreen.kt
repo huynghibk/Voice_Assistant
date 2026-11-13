@@ -1,6 +1,7 @@
 package com.voiceassistant.presentation.translate
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -33,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,6 +73,7 @@ fun ConversationScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var pendingSide by remember { mutableStateOf<ConversationSide?>(null) }
+    var intentSide by remember { mutableStateOf<ConversationSide?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -78,6 +81,30 @@ fun ConversationScreen(
         val side = pendingSide
         pendingSide = null
         if (granted && side != null) viewModel.toggleListening(side)
+    }
+
+    val speechIntentLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val side = intentSide
+        intentSide = null
+        if (side == null) return@rememberLauncherForActivityResult
+        if (result.resultCode == Activity.RESULT_OK) {
+            viewModel.onSpeechIntentResult(side, result.data)
+        } else {
+            viewModel.onSpeechIntentConsumed()
+        }
+    }
+
+    LaunchedEffect(state.pendingSpeechIntentSide) {
+        val side = state.pendingSpeechIntentSide ?: return@LaunchedEffect
+        intentSide = side
+        viewModel.onSpeechIntentConsumed()
+        runCatching {
+            speechIntentLauncher.launch(viewModel.createSpeechIntent(side))
+        }.onFailure {
+            // ignore — status already set by ViewModel
+        }
     }
 
     fun ensureMicThen(side: ConversationSide) {

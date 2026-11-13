@@ -10,6 +10,13 @@ class TextSplitterTest {
     private val splitter = TextSplitter()
 
     @Test
+    fun keepsThousandsCommaIntact() {
+        val chunks = splitter.split("Tổng (12,357pcs) và xong.")
+        assertEquals(1, chunks.size)
+        assertTrue(chunks[0].contains("12,357"))
+    }
+
+    @Test
     fun splitsOnSentencePunctuation() {
         val chunks = splitter.split("Xin chào. Bạn khỏe không? Tuyệt quá!")
         assertEquals(3, chunks.size)
@@ -27,8 +34,15 @@ class TextSplitterTest {
     }
 
     @Test
-    fun splitsOnNewlinesOnlyAsSentences() {
-        val chunks = splitter.split("Câu một\nCâu hai\nCâu ba")
+    fun foldsSingleNewlineIntoOneSentence() {
+        val chunks = splitter.split("issue hàng test\ntest pas COX nhưng không scan")
+        assertEquals(1, chunks.size)
+        assertTrue(chunks[0].contains("test pas"))
+    }
+
+    @Test
+    fun splitsParagraphsOnBlankLine() {
+        val chunks = splitter.split("Câu một\n\nCâu hai\n\nCâu ba")
         assertEquals(3, chunks.size)
     }
 

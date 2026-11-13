@@ -3,6 +3,7 @@ package com.voiceassistant.presentation.translate
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.voiceassistant.R
 import com.voiceassistant.data.translation.OfflineTranslationService
 import com.voiceassistant.domain.model.VoiceModel
 import com.voiceassistant.domain.playback.PlaybackController
@@ -37,7 +38,9 @@ data class ConversationUiState(
     val isSpeaking: Boolean = false,
     val autoSpeak: Boolean = true,
     val statusMessage: String = "",
-    val voices: List<VoiceModel> = emptyList()
+    val voices: List<VoiceModel> = emptyList(),
+    /** When set, UI should launch ACTION_RECOGNIZE_SPEECH for this side. */
+    val pendingSpeechIntentSide: ConversationSide? = null
 )
 
 @HiltViewModel
@@ -108,13 +111,6 @@ class ConversationViewModel @Inject constructor(
 
     fun startListening(side: ConversationSide) {
         stopPlayback()
-        if (!speechToTextEngine.isAvailable()) {
-            _uiState.update {
-                it.copy(statusMessage = "Thiết bị không hỗ trợ nhận dạng giọng nói.")
-            }
-            return
-        }
-
         listenJob?.cancel()
         translateJob?.cancel()
 
@@ -124,11 +120,25 @@ class ConversationViewModel @Inject constructor(
             _uiState.value.theirLang
         }
 
+        // OEM / no SpeechRecognizer → ask UI to launch system RecognizerIntent.
+        if (!speechToTextEngine.isAvailable()) {
+            _uiState.update {
+                it.copy(
+                    isListening = false,
+                    listeningSide = side,
+                    pendingSpeechIntentSide = side,
+                    statusMessage = "Đang mở nhận dạng giọng nói hệ thống…"
+                )
+            }
+            return
+        }
+
         _uiState.update {
             it.copy(
                 isListening = true,
                 listeningSide = side,
                 isTranslating = false,
+                pendingSpeechIntentSide = null,
                 statusMessage = "Đang nghe… hãy nói."
             )
         }
@@ -159,6 +169,16 @@ class ConversationViewModel @Inject constructor(
                             )
                         }
                     }
+                    is SpeechEvent.NeedsIntentFallback -> {
+                        _uiState.update {
+                            it.copy(
+                                isListening = false,
+                                listeningSide = side,
+                                pendingSpeechIntentSide = side,
+                                statusMessage = event.message
+                            )
+                        }
+                    }
                     SpeechEvent.End -> {
                         _uiState.update { state ->
                             if (state.isListening) {
@@ -178,6 +198,39 @@ class ConversationViewModel @Inject constructor(
                 } else it
             }
         }
+    }
+
+    fun speechIntentLocale(side: ConversationSide): Locale {
+        val lang = if (side == ConversationSide.MINE) {
+            _uiState.value.myLang
+        } else {
+            _uiState.value.theirLang
+        }
+        return localeFor(lang)
+    }
+
+    fun createSpeechIntent(side: ConversationSide): android.content.Intent =
+        speechToTextEngine.createRecognizeIntent(speechIntentLocale(side))
+
+    fun onSpeechIntentConsumed() {
+        _uiState.update { it.copy(pendingSpeechIntentSide = null) }
+    }
+
+    fun onSpeechIntentResult(side: ConversationSide, data: android.content.Intent?) {
+        val text = speechToTextEngine.parseRecognizeResult(data)
+        _uiState.update {
+            it.copy(
+                isListening = false,
+                listeningSide = null,
+                pendingSpeechIntentSide = null
+            )
+        }
+        if (text.isNullOrBlank()) {
+            _uiState.update { it.copy(statusMessage = "Không nhận được lời nói. Thử lại.") }
+            return
+        }
+        applyTranscript(side, text, provisional = false)
+        translateAndMaybeSpeak(side, text)
     }
 
     fun stopListening() {
@@ -214,6 +267,12 @@ class ConversationViewModel @Inject constructor(
         }
     }
 
+    private fun translateDoneMessage(): String = if (translationRepository.supportsOnlineAi()) {
+        appContext.getString(R.string.translate_status_done_ai)
+    } else {
+        appContext.getString(R.string.translate_status_done_offline)
+    }
+
     private fun translateAndMaybeSpeak(side: ConversationSide, sourceText: String) {
         if (sourceText.isBlank()) return
         val state = _uiState.value
@@ -235,13 +294,13 @@ class ConversationViewModel @Inject constructor(
                                 myText = sourceText,
                                 theirText = translated,
                                 isTranslating = false,
-                                statusMessage = "Đã dịch."
+                                statusMessage = translateDoneMessage()
                             )
                             ConversationSide.THEIRS -> current.copy(
                                 theirText = sourceText,
                                 myText = translated,
                                 isTranslating = false,
-                                statusMessage = "Đã dịch."
+                                statusMessage = translateDoneMessage()
                             )
                         }
                     }
@@ -264,8 +323,8 @@ class ConversationViewModel @Inject constructor(
     private fun speakTranslation(text: String, targetLang: String) {
         val voice = voiceFor(targetLang) ?: return
         stopPlayback()
-        playbackController.start(text, voice, title = "Conversation")
         TtsPlaybackStarter.start(appContext)
+        playbackController.start(text, voice, title = "Conversation")
     }
 
     private fun voiceFor(langId: String): VoiceModel? {

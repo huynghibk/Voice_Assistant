@@ -1,13 +1,19 @@
 package com.voiceassistant.engine.playback
 
+import android.content.Context
+import com.voiceassistant.R
 import com.voiceassistant.domain.model.VoiceModel
 import com.voiceassistant.domain.playback.PlaybackController
 import com.voiceassistant.domain.playback.PlaybackState
 import com.voiceassistant.domain.playback.SentenceProgress
-import com.voiceassistant.domain.tts.TextSplitter
+import com.voiceassistant.domain.repository.VoiceRepository
+import com.voiceassistant.domain.tts.MultiLanguageTtsPlanner
+import com.voiceassistant.domain.tts.TtsPlannedSentence
+import com.voiceassistant.engine.audio.PlaybackPcm
 import com.voiceassistant.engine.audio.PcmStreamPlayer
 import com.voiceassistant.engine.tts.PiperTtsEngine
 import com.voiceassistant.engine.tts.VoiceConversionEngine
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,10 +36,12 @@ import javax.inject.Singleton
  */
 @Singleton
 class LocalPlaybackController @Inject constructor(
-    private val textSplitter: TextSplitter,
+    private val multiLanguageTtsPlanner: MultiLanguageTtsPlanner,
+    private val voiceRepository: VoiceRepository,
     private val piperTtsEngine: PiperTtsEngine,
     private val voiceConversionEngine: VoiceConversionEngine,
-    private val pcmStreamPlayer: PcmStreamPlayer
+    private val pcmStreamPlayer: PcmStreamPlayer,
+    @ApplicationContext private val context: Context
 ) : PlaybackController {
 
     private val defaultScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -54,6 +62,7 @@ class LocalPlaybackController @Inject constructor(
 
     private var playJob: Job? = null
     private var activeVoice: VoiceModel? = null
+    private var plannedSentences: List<TtsPlannedSentence> = emptyList()
     private val resumeFromIndex = AtomicInteger(0)
 
     private val collected = ArrayList<Short>()
@@ -76,7 +85,10 @@ class LocalPlaybackController @Inject constructor(
         scope.launch {
             startMutex.withLock {
                 stopInternal()
-                val sentences = textSplitter.split(text)
+                val catalog = voiceRepository.listVoices()
+                val planned = multiLanguageTtsPlanner.plan(text, voice, catalog)
+                plannedSentences = planned
+                val sentences = planned.map { it.text }
                 if (sentences.isEmpty()) {
                     _state.update {
                         it.copy(statusMessage = "Không có câu để đọc.", isPlaying = false)
@@ -86,7 +98,7 @@ class LocalPlaybackController @Inject constructor(
                 activeVoice = voice
                 collected.clear()
                 resumeFromIndex.set(0)
-                pcmStreamPlayer.setPlaybackSpeed(_state.value.speed)
+                pcmStreamPlayer.setPlaybackSpeed(1.0f)
                 _state.value = PlaybackState(
                     sentences = sentences,
                     currentSentenceIndex = 0,
@@ -137,7 +149,6 @@ class LocalPlaybackController @Inject constructor(
 
     override fun setSpeed(speed: Float) {
         val clamped = speed.coerceIn(0.5f, 2.5f)
-        pcmStreamPlayer.setPlaybackSpeed(clamped)
         _state.update { it.copy(speed = clamped) }
     }
 
@@ -180,30 +191,59 @@ class LocalPlaybackController @Inject constructor(
                         it.copy(
                             currentSentenceIndex = index,
                             isPlaying = true,
-                            statusMessage = sentences[index].take(80)
+                            isPaused = false,
+                            statusMessage = "Đang phát… ${sentences[index].take(60)}"
                         )
                     }
-                    val chunk = piperTtsEngine.synthesizeSentence(
-                        sentence = sentences[index],
-                        voice = voice,
-                        sentenceIndex = index,
-                        sentenceCount = sentences.size,
-                        speechRate = 1.0f
-                    )
-                    val embedding = voice.embeddingPath?.let { File(it) }
-                    val converted = voiceConversionEngine.convert(
-                        basePcm = chunk.pcm16le,
-                        sampleRateHz = chunk.sampleRateHz,
-                        embeddingFile = embedding
-                    )
-                    sampleRateHz = converted.sampleRateHz
-                    pcmStreamPlayer.playChunk(converted.pcm16le, converted.sampleRateHz)
+                    val plan = plannedSentences.getOrNull(index)
+                    val chunk = try {
+                        piperTtsEngine.synthesizeSentence(
+                            sentence = sentences[index],
+                            voice = plan?.voice ?: voice,
+                            sentenceIndex = index,
+                            sentenceCount = sentences.size,
+                            speechRate = _state.value.speed,
+                            pauseAfterMs = plan?.pauseAfterMs ?: 250
+                        )
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        val errorMsg = when {
+                            e.message?.contains("SYSTEM_TTS_VIETNAMESE_UNSUPPORTED") == true ->
+                                context.getString(R.string.error_missing_google_tts_piper)
+                            e.message?.startsWith("TTS_FAILED:") == true ->
+                                context.getString(R.string.error_tts_failed, e.message?.removePrefix("TTS_FAILED: ") ?: "Unknown error")
+                            e.message?.contains("Piper ONNX") == true ->
+                                context.getString(R.string.error_piper_onnx_failed, e.message ?: "Unknown error")
+                            else ->
+                                e.message ?: "Tổng hợp thất bại."
+                        }
+                        _state.update {
+                            it.copy(
+                                isPlaying = false,
+                                isPaused = false,
+                                statusMessage = errorMsg
+                            )
+                        }
+                        return@launch
+                    }
+                    // Empty PCM means System TTS already spoke via speak() — skip AudioTrack.
+                    if (chunk.pcmFloat.isNotEmpty()) {
+                        val embedding = voice.embeddingPath?.let { File(it) }
+                        val converted = voiceConversionEngine.convert(
+                            basePcm = chunk.pcmFloat,
+                            sampleRateHz = chunk.sampleRateHz,
+                            embeddingFile = embedding
+                        )
+                        sampleRateHz = converted.sampleRateHz
+                        PlaybackPcm.play(pcmStreamPlayer, converted)
+                        collected.addAll(PlaybackPcm.toExportPcm16(converted).toList())
+                    }
                     if (resumeFromIndex.get() != index) {
                         // interrupted by skip — loop will restart or continue at new index
                         index = resumeFromIndex.get()
                         continue
                     }
-                    collected.addAll(converted.pcm16le.toList())
                     index++
                     resumeFromIndex.set(index)
                 }
@@ -240,6 +280,7 @@ class LocalPlaybackController @Inject constructor(
         pcmStreamPlayer.setPaused(false)
         pcmStreamPlayer.stop()
         activeVoice = null
+        plannedSentences = emptyList()
         _state.update {
             it.copy(
                 isPlaying = false,

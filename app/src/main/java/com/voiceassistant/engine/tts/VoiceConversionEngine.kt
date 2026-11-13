@@ -1,6 +1,7 @@
 package com.voiceassistant.engine.tts
 
 import android.content.Context
+import com.voiceassistant.engine.audio.PcmSamples
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
@@ -9,10 +10,6 @@ import java.io.File
 import java.nio.FloatBuffer
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
-
 /**
  * Voice Conversion stage (mandatory architecture):
  *   Text → PiperTtsEngine (base PCM) → VoiceConversionEngine → target PCM
@@ -28,7 +25,8 @@ class VoiceConversionEngine @Inject constructor(
 ) {
 
     data class ConversionResult(
-        val pcm16le: ShortArray,
+        val pcmFloat: FloatArray? = null,
+        val pcm16le: ShortArray? = null,
         val sampleRateHz: Int,
         val usedConversion: Boolean
     )
@@ -37,24 +35,25 @@ class VoiceConversionEngine @Inject constructor(
     private var session: OrtSession? = null
 
     fun convert(
-        basePcm: ShortArray,
+        basePcm: FloatArray,
         sampleRateHz: Int,
         embeddingFile: File?
     ): ConversionResult {
         if (embeddingFile == null || !embeddingFile.exists()) {
-            return ConversionResult(basePcm, sampleRateHz, usedConversion = false)
+            return ConversionResult(pcmFloat = basePcm, sampleRateHz = sampleRateHz, usedConversion = false)
         }
         val embedding = embeddingExtractor.loadEmbedding(embeddingFile)
-            ?: return ConversionResult(basePcm, sampleRateHz, usedConversion = false)
+            ?: return ConversionResult(pcmFloat = basePcm, sampleRateHz = sampleRateHz, usedConversion = false)
 
+        val baseShort = PcmSamples.floatToPcm16(basePcm)
         val onnxPath = resolveConverterModel()
         if (onnxPath != null) {
             runCatching {
-                return convertWithOnnx(basePcm, sampleRateHz, embedding, onnxPath)
+                return convertWithOnnx(baseShort, sampleRateHz, embedding, onnxPath)
             }
         }
-        val converted = applyTimbreTransfer(basePcm, embedding)
-        return ConversionResult(converted, sampleRateHz, usedConversion = true)
+        // Without a real VC model, passthrough — legacy spectral filter sounded harsh / distorted.
+        return ConversionResult(pcmFloat = basePcm, sampleRateHz = sampleRateHz, usedConversion = false)
     }
 
     private fun resolveConverterModel(): String? {
@@ -117,35 +116,14 @@ class VoiceConversionEngine @Inject constructor(
                     val pcm = ShortArray(floats.size) { i ->
                         (floats[i].coerceIn(-1f, 1f) * Short.MAX_VALUE).toInt().toShort()
                     }
-                    return ConversionResult(pcm, sampleRateHz, usedConversion = true)
+                    return ConversionResult(
+                        pcm16le = pcm,
+                        sampleRateHz = sampleRateHz,
+                        usedConversion = true
+                    )
                 }
             }
         }
     }
 
-    /**
-     * Lightweight timbre transfer: reshape spectral tilt + mild formant shift
-     * driven by embedding pitch/tilt/rms dimensions.
-     */
-    private fun applyTimbreTransfer(basePcm: ShortArray, embedding: FloatArray): ShortArray {
-        val pitchFactor = (0.85f + (embedding.getOrElse(24) { 0.3f }.coerceIn(0f, 1f) * 0.35f))
-        val tilt = embedding.getOrElse(25) { 0f }.coerceIn(-1f, 1f)
-        val brightness = 0.55f + embedding.getOrElse(26) { 0.3f }.coerceIn(0f, 1f) * 0.5f
-
-        val out = ShortArray(basePcm.size)
-        var prev = 0f
-        for (i in basePcm.indices) {
-            val x = basePcm[i] / Short.MAX_VALUE.toFloat()
-            // One-pole tilt filter
-            val filtered = brightness * x + (1f - brightness) * prev + tilt * 0.08f * x
-            prev = filtered
-            // Soft pitch coloration via amplitude modulation
-            val mod = 1f + 0.04f * sin(2.0 * PI * i * pitchFactor / 220.0).toFloat()
-            val y = (filtered * mod).coerceIn(-1f, 1f)
-            // Gentle even harmonic for warmer timbre
-            val warm = y + 0.08f * y * y * cos(2.0 * PI * i / 110.0).toFloat()
-            out[i] = (warm.coerceIn(-1f, 1f) * Short.MAX_VALUE).toInt().toShort()
-        }
-        return out
-    }
 }

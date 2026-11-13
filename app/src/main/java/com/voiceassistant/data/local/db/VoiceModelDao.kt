@@ -12,6 +12,9 @@ interface VoiceModelDao {
     @Query("SELECT * FROM voice_models ORDER BY isDefault DESC, name ASC")
     fun observeAll(): Flow<List<VoiceModelEntity>>
 
+    @Query("SELECT * FROM voice_models ORDER BY isDefault DESC, name ASC")
+    suspend fun listAll(): List<VoiceModelEntity>
+
     @Query("SELECT * FROM voice_models WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): VoiceModelEntity?
 

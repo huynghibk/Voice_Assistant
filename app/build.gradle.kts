@@ -63,8 +63,8 @@ android {
             excludes.addAll(setOf("/META-INF/{AL2.0,LGPL2.1}", "META-INF/depends.txt"))
         }
         jniLibs {
-            // Helps onnxruntime / ffmpeg-kit load correctly on x86_64 emulators
             useLegacyPackaging = true
+            pickFirsts.add("lib/**/libonnxruntime.so")
         }
     }
     testOptions {
@@ -72,13 +72,11 @@ android {
             isIncludeAndroidResources = true
             isReturnDefaultValues = true
             all {
-                // Jar is synced into ~/.m2 by syncRobolectricAndroidAll; also point dependency dir
-                // so LocalDependencyResolver can resolve without hitting blocked Maven Central.
                 val robolectricDepsDir = layout.buildDirectory.dir("robolectric-deps").get().asFile
                 it.systemProperties["robolectric.offline"] = "true"
                 it.systemProperties["robolectric.dependency.dir"] = robolectricDepsDir.absolutePath
                 it.systemProperties["robolectric.dependency.repo.url"] =
-                    "https://maven-central.storage-download.googleapis.com/maven2"
+                    "https://googleapis.com"
                 it.systemProperties["robolectric.dependency.repo.id"] = "google-maven-central"
             }
         }
@@ -113,8 +111,13 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
-    // ONNX Runtime Mobile — Piper / Voice Conversion offline
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.19.0")
+    // ONNX Runtime Mobile — Voice Conversion offline
+    // Must match libonnxruntime.so shipped inside sherpa-onnx AAR (1.17.x) — mismatch crashes native JNI.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.1")
+    implementation("org.apache.commons:commons-compress:1.26.0")
+
+    // Sherpa-ONNX — Piper TTS offline (kèm sẵn espeak-ng C++). AAR only — do not add classes.jar from the same release.
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar"))))
 
     // FFmpeg audio-only (not full — avoids +40MB video codecs)
     implementation("com.arthenica:ffmpeg-kit-audio:6.0-2")
@@ -147,7 +150,6 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
     testImplementation(libs.robolectric)
-    // Pre-resolve Android SDK jars via Gradle repos (avoids Robolectric's direct Maven Central fetch)
     testImplementation("org.robolectric:android-all-instrumented:13-robolectric-9030017-i6")
     testImplementation("org.robolectric:android-all-instrumented:14-robolectric-10818077-i6")
     testImplementation(libs.androidx.test.core)
@@ -166,10 +168,6 @@ kapt {
     correctErrorTypes = true
 }
 
-/**
- * Copy Robolectric android-all jars into build/robolectric-deps (flat) and ~/.m2
- * so offline / proxied environments can run Compose UI tests.
- */
 tasks.register("syncRobolectricAndroidAll") {
     doLast {
         val config = configurations.getByName("debugUnitTestRuntimeClasspath")

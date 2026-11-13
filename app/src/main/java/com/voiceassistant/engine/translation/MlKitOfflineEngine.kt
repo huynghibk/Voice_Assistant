@@ -34,7 +34,8 @@ class MlKitOfflineEngine @Inject constructor() : TranslationEngine {
 
             val translator = getTranslator(source, target)
             ensureModelDownloaded(translator)
-            translateWith(translator, text)
+            val raw = translateWith(translator, text)
+            OfflineTranslationPolisher.polish(raw, targetLang)
         }
     }
 

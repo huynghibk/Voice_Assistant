@@ -8,6 +8,7 @@
 .externalNativeBuild
 .cxx
 app/build/
+/local-tts-models/
 *.apk
 *.aab
 *.ap_

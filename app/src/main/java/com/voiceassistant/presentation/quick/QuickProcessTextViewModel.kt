@@ -112,8 +112,8 @@ class QuickProcessTextViewModel @Inject constructor(
                 TtsPlaybackStarter.stop(appContext)
                 return@launch
             }
-            playbackController.start(text, voice, title = "Quick Translate")
             TtsPlaybackStarter.start(appContext)
+            playbackController.start(text, voice, title = "Quick Translate")
         }
     }
 

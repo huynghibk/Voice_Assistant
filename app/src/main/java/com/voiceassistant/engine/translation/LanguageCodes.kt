@@ -8,6 +8,16 @@ import com.voiceassistant.domain.translation.LanguageIdentifier
  */
 object LanguageCodes {
 
+    fun isTraditionalChinese(idOrCode: String): Boolean {
+        val key = idOrCode.trim().lowercase().replace('_', '-')
+        return key == "zh-tw" || key.startsWith("zh-hant") || key.startsWith("zh-hk")
+    }
+
+    fun isSimplifiedChinese(idOrCode: String): Boolean {
+        val key = idOrCode.trim().lowercase().replace('_', '-')
+        return key.startsWith("zh") && !isTraditionalChinese(idOrCode)
+    }
+
     fun toMlKit(idOrCode: String): String {
         val key = idOrCode.trim().lowercase().replace('_', '-')
         return when {

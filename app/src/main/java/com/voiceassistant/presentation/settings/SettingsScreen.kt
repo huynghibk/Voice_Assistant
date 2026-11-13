@@ -49,6 +49,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.voiceassistant.R
 import com.voiceassistant.domain.model.AppLanguage
+import com.voiceassistant.domain.tts.TtsBackend
 import com.voiceassistant.presentation.components.VaBrandMark
 import com.voiceassistant.presentation.components.VaGhostButton
 import com.voiceassistant.presentation.components.VaPrimaryButton
@@ -122,6 +123,19 @@ fun SettingsScreen(
                 title = stringResource(R.string.settings_voice),
                 subtitle = stringResource(R.string.settings_voice_subtitle)
             )
+            Spacer(Modifier.height(12.dp))
+            SettingsRow(
+                icon = { Icon(Icons.Outlined.VolumeUp, contentDescription = null) },
+                title = stringResource(R.string.settings_tts_engine_title),
+                subtitle = stringResource(R.string.settings_tts_engine_subtitle)
+            )
+            Spacer(Modifier.height(12.dp))
+            TtsBackendChipRow(
+                backends = viewModel.supportedTtsBackends,
+                selected = ui.ttsBackend,
+                labelFor = { viewModel.ttsBackendLabelRes(it) },
+                onSelect = viewModel::onTtsBackendSelected
+            )
             Spacer(Modifier.height(14.dp))
             SettingsRow(
                 icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
@@ -149,12 +163,32 @@ fun SettingsScreen(
                     stringResource(R.string.settings_gemini_subtitle)
                 }
             )
+            if (ui.hasStoredKey && ui.storedKeyMask.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = if (ui.keyFromBuildConfig) {
+                        stringResource(R.string.settings_gemini_key_build, ui.storedKeyMask)
+                    } else {
+                        stringResource(R.string.settings_gemini_key_active, ui.storedKeyMask)
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = ui.apiKeyInput,
                 onValueChange = viewModel::onApiKeyChange,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(stringResource(R.string.settings_gemini_hint)) },
+                placeholder = {
+                    Text(
+                        if (ui.hasStoredKey) {
+                            stringResource(R.string.settings_gemini_replace_hint)
+                        } else {
+                            stringResource(R.string.settings_gemini_hint)
+                        }
+                    )
+                },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 shape = MaterialTheme.shapes.medium,
@@ -193,6 +227,98 @@ fun SettingsScreen(
                     onClick = viewModel::clearApiKey,
                     modifier = Modifier.weight(1f),
                     enabled = ui.hasStoredKey || ui.apiKeyInput.isNotBlank()
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            SettingsRow(
+                icon = { Icon(Icons.Outlined.VpnKey, contentDescription = null) },
+                title = stringResource(R.string.settings_gcloud_tts_title),
+                subtitle = stringResource(R.string.settings_gcloud_tts_subtitle)
+            )
+            if (ui.hasGoogleCloudTtsKey && ui.googleCloudTtsMask.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    ui.googleCloudTtsMask,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = ui.googleCloudTtsInput,
+                onValueChange = viewModel::onGoogleCloudTtsKeyChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text(stringResource(R.string.settings_gcloud_tts_hint)) },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                shape = MaterialTheme.shapes.medium,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = extras.hairline
+                )
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                stringResource(R.string.settings_gcloud_tts_help),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
+            SettingsRow(
+                icon = { Icon(Icons.Outlined.VpnKey, contentDescription = null) },
+                title = stringResource(R.string.settings_elevenlabs_title),
+                subtitle = stringResource(R.string.settings_elevenlabs_subtitle)
+            )
+            if (ui.hasElevenLabsKey && ui.elevenLabsMask.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    ui.elevenLabsMask,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = ui.elevenLabsInput,
+                onValueChange = viewModel::onElevenLabsKeyChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text(stringResource(R.string.settings_elevenlabs_hint)) },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                shape = MaterialTheme.shapes.medium,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = extras.hairline
+                )
+            )
+            if (ui.ttsKeyMessage.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    ui.ttsKeyMessage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                VaPrimaryButton(
+                    text = stringResource(R.string.settings_gemini_save),
+                    onClick = {
+                        if (ui.googleCloudTtsInput.isNotBlank()) viewModel.saveGoogleCloudTtsKey()
+                        if (ui.elevenLabsInput.isNotBlank()) viewModel.saveElevenLabsKey()
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                VaGhostButton(
+                    text = stringResource(R.string.settings_gemini_clear),
+                    onClick = {
+                        viewModel.clearGoogleCloudTtsKey()
+                        viewModel.clearElevenLabsKey()
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = ui.hasGoogleCloudTtsKey || ui.hasElevenLabsKey ||
+                        ui.googleCloudTtsInput.isNotBlank() || ui.elevenLabsInput.isNotBlank()
                 )
             }
         }
@@ -234,6 +360,43 @@ fun SettingsScreen(
             }
         }
         Spacer(Modifier.height(28.dp))
+    }
+}
+
+@Composable
+private fun TtsBackendChipRow(
+    backends: List<TtsBackend>,
+    selected: TtsBackend,
+    labelFor: (TtsBackend) -> Int,
+    onSelect: (TtsBackend) -> Unit
+) {
+    val extras = LocalVaExtra.current
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        backends.forEach { backend ->
+            val isSelected = backend == selected
+            Text(
+                text = stringResource(labelFor(backend)),
+                style = MaterialTheme.typography.labelLarge,
+                color = if (isSelected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .clip(MaterialTheme.shapes.small)
+                    .background(
+                        if (isSelected) extras.amberMuted
+                        else MaterialTheme.colorScheme.surface
+                    )
+                    .border(
+                        1.dp,
+                        if (isSelected) MaterialTheme.colorScheme.primary else extras.hairline,
+                        MaterialTheme.shapes.small
+                    )
+                    .clickable { onSelect(backend) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            )
+        }
     }
 }
 

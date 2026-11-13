@@ -30,14 +30,17 @@ class PcmStreamPlayer @Inject constructor(
     private var audioTrack: AudioTrack? = null
     private var currentSampleRate: Int = 0
     private var currentBufferMultiplier: Int = 0
+    private var currentEncoding: Int = AudioFormat.ENCODING_PCM_16BIT
     @Volatile private var playbackSpeed: Float = 1.0f
+    // Piper/sherpa already apply speed at synthesis — time-stretch here causes muffled/rè audio.
+    @Volatile private var allowPlaybackTimeStretch: Boolean = false
 
     private val interrupted = AtomicBoolean(false)
     private val paused = AtomicBoolean(false)
 
     suspend fun playChunk(pcm16le: ShortArray, sampleRateHz: Int) = withContext(Dispatchers.IO) {
         interrupted.set(false)
-        ensureTrackReady(sampleRateHz)
+        ensureTrackReady(sampleRateHz, AudioFormat.ENCODING_PCM_16BIT)
 
         var offset = 0
         while (offset < pcm16le.size) {
@@ -49,7 +52,27 @@ class PcmStreamPlayer @Inject constructor(
             }
             if (interrupted.get()) break
 
-            val written = writeSamples(pcm16le, offset)
+            val written = writeSamples16(pcm16le, offset)
+            if (written <= 0) break
+            offset += written
+        }
+    }
+
+    suspend fun playChunkFloat(pcmFloat: FloatArray, sampleRateHz: Int) = withContext(Dispatchers.IO) {
+        interrupted.set(false)
+        ensureTrackReady(sampleRateHz, AudioFormat.ENCODING_PCM_FLOAT)
+
+        var offset = 0
+        while (offset < pcmFloat.size) {
+            if (interrupted.get()) break
+
+            while (paused.get() && !interrupted.get()) {
+                pauseTrack()
+                delay(40)
+            }
+            if (interrupted.get()) break
+
+            val written = writeSamplesFloat(pcmFloat, offset)
             if (written <= 0) break
             offset += written
         }
@@ -66,7 +89,7 @@ class PcmStreamPlayer @Inject constructor(
 
     fun setPlaybackSpeed(speed: Float) {
         playbackSpeed = speed.coerceIn(0.5f, 2.5f)
-        applySpeed()
+        if (allowPlaybackTimeStretch) applySpeed()
     }
 
     suspend fun stop() = withContext(Dispatchers.IO) {
@@ -80,18 +103,18 @@ class PcmStreamPlayer @Inject constructor(
             val rate = currentSampleRate
             releaseTrackLocked()
             if (rate > 0) {
-                ensureTrackLocked(rate)
+                ensureTrackLocked(rate, currentEncoding)
                 applySpeedLocked()
             }
         }
     }
 
-    private suspend fun ensureTrackReady(sampleRateHz: Int) {
+    private suspend fun ensureTrackReady(sampleRateHz: Int, encoding: Int) {
         // Force media routing: never earpiece / SCO / communication device.
         forceMediaOutputRoute()
 
         mutex.withLock {
-            ensureTrackLocked(sampleRateHz)
+            ensureTrackLocked(sampleRateHz, encoding)
             applySpeedLocked()
             val track = audioTrack ?: return@withLock
             preferRouteDevice(track)
@@ -150,7 +173,7 @@ class PcmStreamPlayer @Inject constructor(
         preferred?.let { runCatching { track.setPreferredDevice(it) } }
     }
 
-    private suspend fun writeSamples(pcm16le: ShortArray, offset: Int): Int =
+    private suspend fun writeSamples16(pcm16le: ShortArray, offset: Int): Int =
         mutex.withLock {
             val track = audioTrack ?: return@withLock -1
             if (track.playState != AudioTrack.PLAYSTATE_PLAYING) {
@@ -159,13 +182,23 @@ class PcmStreamPlayer @Inject constructor(
             track.write(pcm16le, offset, pcm16le.size - offset)
         }
 
+    private suspend fun writeSamplesFloat(pcmFloat: FloatArray, offset: Int): Int =
+        mutex.withLock {
+            val track = audioTrack ?: return@withLock -1
+            if (track.playState != AudioTrack.PLAYSTATE_PLAYING) {
+                runCatching { track.play() }
+            }
+            @Suppress("NewApi")
+            track.write(pcmFloat, offset, pcmFloat.size - offset, AudioTrack.WRITE_BLOCKING)
+        }
+
     private fun pauseTrack() {
         runCatching { audioTrack?.pause() }
     }
 
     private fun applySpeed() {
+        if (!allowPlaybackTimeStretch) return
         runCatching {
-            // Best-effort without mutex — applySpeedLocked used when holding lock
             val track = audioTrack ?: return
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 track.playbackParams = PlaybackParams()
@@ -176,18 +209,19 @@ class PcmStreamPlayer @Inject constructor(
         }
     }
 
-    private fun ensureTrackLocked(sampleRateHz: Int) {
+    private fun ensureTrackLocked(sampleRateHz: Int, encoding: Int) {
         val multiplier = audioRoutingManager.route.value.bufferMultiplier.coerceIn(2, 8)
         if (audioTrack != null &&
             currentSampleRate == sampleRateHz &&
-            currentBufferMultiplier == multiplier
+            currentBufferMultiplier == multiplier &&
+            currentEncoding == encoding
         ) return
 
         audioTrack?.release()
         val minBuf = AudioTrack.getMinBufferSize(
             sampleRateHz,
             AudioFormat.CHANNEL_OUT_MONO,
-            AudioFormat.ENCODING_PCM_16BIT
+            encoding
         ).coerceAtLeast(2048)
 
         val attrs = AudioAttributes.Builder()
@@ -199,7 +233,7 @@ class PcmStreamPlayer @Inject constructor(
             .setAudioAttributes(attrs)
             .setAudioFormat(
                 AudioFormat.Builder()
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setEncoding(encoding)
                     .setSampleRate(sampleRateHz)
                     .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                     .build()
@@ -210,9 +244,11 @@ class PcmStreamPlayer @Inject constructor(
         preferRouteDevice(audioTrack!!)
         currentSampleRate = sampleRateHz
         currentBufferMultiplier = multiplier
+        currentEncoding = encoding
     }
 
     private fun applySpeedLocked() {
+        if (!allowPlaybackTimeStretch) return
         val track = audioTrack ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             runCatching {
@@ -236,5 +272,6 @@ class PcmStreamPlayer @Inject constructor(
         audioTrack = null
         currentSampleRate = 0
         currentBufferMultiplier = 0
+        currentEncoding = AudioFormat.ENCODING_PCM_16BIT
     }
 }

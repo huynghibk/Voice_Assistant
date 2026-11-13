@@ -1,6 +1,7 @@
 package com.voiceassistant.engine.translation
 
 import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.generationConfig
 import com.voiceassistant.BuildConfig
 import com.voiceassistant.data.prefs.ApiKeyStore
 import com.voiceassistant.domain.engine.TranslationEngine
@@ -38,7 +39,13 @@ class GeminiOnlineEngine @Inject constructor(
             return null
         }
         if (key == cachedKey && cachedModel != null) return cachedModel
-        val model = GenerativeModel(modelName = "gemini-1.5-flash", apiKey = key)
+        val model = GenerativeModel(
+            modelName = "gemini-2.0-flash",
+            apiKey = key,
+            generationConfig = generationConfig {
+                temperature = 0.15f
+            }
+        )
         cachedKey = key
         cachedModel = model
         return model
@@ -56,15 +63,7 @@ class GeminiOnlineEngine @Inject constructor(
             val generativeModel = modelForCurrentKey()
                 ?: error("Thiếu Gemini API key. Thêm trong Cài đặt hoặc local.properties.")
 
-            val sourceName = LanguageCodes.displayName(sourceLang)
-            val targetName = LanguageCodes.displayName(targetLang)
-            val prompt = buildString {
-                appendLine("You are a precise translation engine.")
-                appendLine("Translate the following text from $sourceName to $targetName.")
-                appendLine("Return ONLY the translated text with no quotes, labels, or commentary.")
-                appendLine()
-                append(text)
-            }
+            val prompt = TranslationPrompts.geminiPrompt(text, sourceLang, targetLang)
 
             val response = generativeModel.generateContent(prompt)
             val translated = response.text?.trim().orEmpty()

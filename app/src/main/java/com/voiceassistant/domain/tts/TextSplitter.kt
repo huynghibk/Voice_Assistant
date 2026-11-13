@@ -3,8 +3,7 @@ package com.voiceassistant.domain.tts
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Splits long text into sentence-sized chunks (period / newline / !?).
-// Never splits letter-by-letter or word-by-word for normal sentences.
+// Splits on clause punctuation (. ! ? … , ; :) — not between words or languages.
 @Singleton
 class TextSplitter @Inject constructor() {
 
@@ -15,27 +14,57 @@ class TextSplitter @Inject constructor() {
             .trim()
         if (normalized.isEmpty()) return emptyList()
 
-        // Sentence boundaries only: . ! ? … or newline. Keep full sentences intact.
-        val sentenceRegex = Regex("""[^.!?…\n]+[.!?…\n]+|[^.!?…\n]+$""")
-        val sentences = sentenceRegex.findAll(normalized)
-            .map { it.value.trim() }
+        val paragraphs = normalized
+            .split(Regex("""\n\s*\n+"""))
+            .map { it.trim() }
             .filter { it.isNotEmpty() }
-            .toList()
-
-        if (sentences.isEmpty()) return softSplitByWords(normalized, maxCharsPerChunk)
+        if (paragraphs.isEmpty()) return emptyList()
 
         val chunks = mutableListOf<String>()
-        for (sentence in sentences) {
-            if (sentence.length <= maxCharsPerChunk) {
-                chunks += sentence
-            } else {
-                chunks += softSplitByWords(sentence, maxCharsPerChunk)
+        for (paragraph in paragraphs) {
+            for (piece in splitByPunctuation(paragraph)) {
+                if (piece.length <= maxCharsPerChunk) {
+                    chunks += piece
+                } else {
+                    chunks += softSplitByWords(piece, maxCharsPerChunk)
+                }
             }
         }
         return chunks
     }
 
-    // Only used for oversized sentences — break on whitespace/punctuation, never per character.
+    private fun splitByPunctuation(paragraph: String): List<String> {
+        val result = mutableListOf<String>()
+        val buf = StringBuilder()
+        var i = 0
+        while (i < paragraph.length) {
+            val ch = paragraph[i]
+            buf.append(ch)
+            if (isClauseBoundary(paragraph, i, ch)) {
+                val piece = buf.toString().trim()
+                if (piece.isNotEmpty()) result += piece
+                buf.clear()
+            }
+            i++
+        }
+        val tail = buf.toString().trim()
+        if (tail.isNotEmpty()) result += tail
+        return result
+    }
+
+  private fun isClauseBoundary(text: String, index: Int, ch: Char): Boolean {
+        return when (ch) {
+            '.', '!', '?', '…' -> true
+            ';', ':' -> true
+            ',' -> {
+                val prevDigit = index > 0 && text[index - 1].isDigit()
+                val nextDigit = index + 1 < text.length && text[index + 1].isDigit()
+                !(prevDigit && nextDigit)
+            }
+            else -> false
+        }
+    }
+
     private fun softSplitByWords(text: String, maxChars: Int): List<String> {
         if (text.length <= maxChars) return listOf(text)
         val result = mutableListOf<String>()
@@ -44,11 +73,10 @@ class TextSplitter @Inject constructor() {
             var end = minOf(start + maxChars, text.length)
             if (end < text.length) {
                 val window = text.substring(start, end)
-                val breakAt = window.lastIndexOfAny(charArrayOf(' ', '\n', ',', ';', ':', '—', '-'))
+                val breakAt = window.lastIndexOfAny(charArrayOf(' ', '\n', '—', '-'))
                 if (breakAt > 0) {
                     end = start + breakAt + 1
                 }
-                // If no whitespace in window, keep extending to next space to avoid letter chunks.
                 if (breakAt <= 0) {
                     val nextSpace = text.indexOfAny(charArrayOf(' ', '\n'), startIndex = end)
                     end = if (nextSpace > start) nextSpace + 1 else text.length
@@ -62,7 +90,6 @@ class TextSplitter @Inject constructor() {
     }
 
     companion object {
-        // Large enough that typical paragraphs stay as whole sentences.
         const val MAX_CHARS_PER_CHUNK = 500
     }
 }

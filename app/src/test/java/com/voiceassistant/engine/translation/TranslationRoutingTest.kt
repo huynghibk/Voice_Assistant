@@ -27,6 +27,7 @@ class TranslationRoutingTest {
         gemini = mockk()
         mlKit = mockk()
         network = mockk()
+        every { gemini.hasApiKey() } returns true
         repository = TranslationRepositoryImpl(gemini, mlKit, network)
     }
 
@@ -67,6 +68,20 @@ class TranslationRoutingTest {
         assertEquals("こんにちは", result.getOrThrow())
         coVerify(exactly = 1) { gemini.translate("hi", "en", "ja") }
         coVerify(exactly = 1) { mlKit.translate("hi", "en", "ja") }
+    }
+
+    @Test
+    fun supportsOnlineAiRequiresNetworkAndKey() {
+        every { network.isOnline() } returns true
+        every { gemini.hasApiKey() } returns true
+        assertTrue(repository.supportsOnlineAi())
+
+        every { gemini.hasApiKey() } returns false
+        assertTrue(!repository.supportsOnlineAi())
+
+        every { gemini.hasApiKey() } returns true
+        every { network.isOnline() } returns false
+        assertTrue(!repository.supportsOnlineAi())
     }
 
     @Test

@@ -44,9 +44,55 @@ class ApiKeyStore @Inject constructor(
 
     fun hasUserKey(): Boolean = getGeminiApiKey().isNotBlank()
 
+    /** Masked hint for UI, e.g. AIzaSy••••••abcd (never returns the full key). */
+    fun maskedKeyPreview(): String {
+        val key = getGeminiApiKey()
+        if (key.isBlank()) return ""
+        if (key.length <= 8) return "••••••••"
+        return "${key.take(6)}••••${key.takeLast(4)}"
+    }
+
+    fun getGoogleCloudTtsApiKey(): String =
+        prefs.getString(KEY_GOOGLE_CLOUD_TTS, "").orEmpty().trim()
+
+    fun setGoogleCloudTtsApiKey(value: String) {
+        prefs.edit().putString(KEY_GOOGLE_CLOUD_TTS, value.trim()).apply()
+    }
+
+    fun clearGoogleCloudTtsApiKey() {
+        prefs.edit().remove(KEY_GOOGLE_CLOUD_TTS).apply()
+    }
+
+    fun hasGoogleCloudTtsKey(): Boolean = getGoogleCloudTtsApiKey().isNotBlank()
+
+    fun maskedGoogleCloudTtsKeyPreview(): String = maskKey(getGoogleCloudTtsApiKey())
+
+    fun getElevenLabsApiKey(): String =
+        prefs.getString(KEY_ELEVEN_LABS, "").orEmpty().trim()
+
+    fun setElevenLabsApiKey(value: String) {
+        prefs.edit().putString(KEY_ELEVEN_LABS, value.trim()).apply()
+    }
+
+    fun clearElevenLabsApiKey() {
+        prefs.edit().remove(KEY_ELEVEN_LABS).apply()
+    }
+
+    fun hasElevenLabsKey(): Boolean = getElevenLabsApiKey().isNotBlank()
+
+    fun maskedElevenLabsKeyPreview(): String = maskKey(getElevenLabsApiKey())
+
+    private fun maskKey(key: String): String {
+        if (key.isBlank()) return ""
+        if (key.length <= 8) return "••••••••"
+        return "${key.take(6)}••••${key.takeLast(4)}"
+    }
+
     companion object {
         private const val FILE_NAME = "va_secure_prefs"
         private const val FILE_NAME_FALLBACK = "va_api_key_fallback"
         private const val KEY_GEMINI = "gemini_api_key"
+        private const val KEY_GOOGLE_CLOUD_TTS = "google_cloud_tts_api_key"
+        private const val KEY_ELEVEN_LABS = "elevenlabs_api_key"
     }
 }

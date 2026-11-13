@@ -9,8 +9,15 @@ data class PiperVoicePack(
     val estimatedSizeMb: Int = 63,
     val isReady: Boolean = false,
     val modelDownloadUrl: String? = null,
-    val configDownloadUrl: String? = null
-)
+    val configDownloadUrl: String? = null,
+    // k2-fsa/sherpa-onnx release tar.bz2 (Melo, Piper packs, …)
+    val sherpaTarballUrl: String? = null,
+    // Extra files next to model.onnx (e.g. tokens.txt for MMS)
+    val companionDownloadUrls: Map<String, String> = emptyMap()
+) {
+    fun hasDownloadSource(): Boolean =
+        !modelDownloadUrl.isNullOrBlank() || !sherpaTarballUrl.isNullOrBlank()
+}
 
 data class MlKitLanguagePack(
     val languageCode: String,

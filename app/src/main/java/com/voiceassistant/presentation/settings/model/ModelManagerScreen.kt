@@ -46,7 +46,6 @@ fun ModelManagerScreen(
     viewModel: ModelManagerViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val extras = LocalVaExtra.current
 
     Column(
         modifier = Modifier
@@ -164,23 +163,23 @@ private fun PiperPackRow(
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                if (pack.isReady) {
-                    stringResource(R.string.model_status_ready)
-                } else {
-                    stringResource(R.string.model_status_system_tts)
+                when {
+                    pack.isReady -> stringResource(R.string.model_status_ready)
+                    pack.hasDownloadSource() -> stringResource(R.string.model_status_not_installed)
+                    else -> stringResource(R.string.model_status_unavailable)
                 },
                 style = MaterialTheme.typography.labelLarge,
-                color = if (pack.isReady) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
+                color = when {
+                    pack.isReady -> MaterialTheme.colorScheme.primary
+                    pack.hasDownloadSource() -> MaterialTheme.colorScheme.onSurface
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
             )
         }
         Spacer(Modifier.width(8.dp))
         when {
             busy -> CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-            !pack.isReady && pack.modelDownloadUrl != null -> TextButton(onClick = onDownload) {
+            !pack.isReady && pack.hasDownloadSource() -> TextButton(onClick = onDownload) {
                 Text(stringResource(R.string.model_download))
             }
         }

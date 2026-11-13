@@ -202,8 +202,8 @@ class ProjectEditorViewModel @Inject constructor(
         val voice = state.voices.firstOrNull { it.id == state.selectedVoiceId } ?: return
         if (state.isPlaying) stop()
         playbackController.setSpeed(state.playbackSpeed)
-        playbackController.start(text, voice, title = state.title.ifBlank { "Studio" })
         TtsPlaybackStarter.start(appContext)
+        playbackController.start(text, voice, title = state.title.ifBlank { "Studio" })
     }
 
     fun stop() {

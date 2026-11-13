@@ -1,7 +1,10 @@
 package com.voiceassistant.engine.playback
 
+import android.content.Context
 import com.voiceassistant.domain.model.VoiceModel
-import com.voiceassistant.domain.tts.TextSplitter
+import com.voiceassistant.domain.repository.VoiceRepository
+import com.voiceassistant.domain.tts.MultiLanguageTtsPlanner
+import com.voiceassistant.domain.tts.TtsPlannedSentence
 import com.voiceassistant.engine.audio.PcmStreamPlayer
 import com.voiceassistant.engine.tts.PcmChunk
 import com.voiceassistant.engine.tts.PiperTtsEngine
@@ -38,12 +41,13 @@ class PlaybackControllerTest {
         every { pcm.interruptCurrentChunk() } just runs
         every { pcm.setPaused(any()) } just runs
         coEvery { pcm.playChunk(any(), any()) } just runs
+        coEvery { pcm.playChunkFloat(any(), any()) } just runs
         coEvery { pcm.stop() } just runs
         every { piper.cancel() } just runs
         every { piper.clearCancel() } just runs
         every { vc.convert(any(), any(), any()) } answers {
             VoiceConversionEngine.ConversionResult(
-                pcm16le = firstArg(),
+                pcmFloat = firstArg(),
                 sampleRateHz = secondArg(),
                 usedConversion = false
             )
@@ -57,16 +61,27 @@ class PlaybackControllerTest {
                 sentenceIndex = arg(2),
                 sentenceCount = arg(3),
                 sentence = firstArg(),
-                pcm16le = shortArrayOf(1, 2, 3),
+                pcmFloat = floatArrayOf(0.1f, 0.2f, 0.3f),
                 sampleRateHz = PiperTtsEngine.SAMPLE_RATE
             )
         }
 
+        val planner = mockk<MultiLanguageTtsPlanner>()
+        val voices = mockk<VoiceRepository>()
+        coEvery { voices.listVoices() } returns listOf(voice)
+        every { planner.plan(any(), any(), any()) } answers {
+            val t = firstArg<String>()
+            listOf(TtsPlannedSentence(text = t, voice = secondArg(), pauseAfterMs = 250))
+        }
+
+        val context = mockk<Context>(relaxed = true)
         val controller = LocalPlaybackController(
-            textSplitter = TextSplitter(),
+            multiLanguageTtsPlanner = planner,
+            voiceRepository = voices,
             piperTtsEngine = piper,
             voiceConversionEngine = vc,
-            pcmStreamPlayer = pcm
+            pcmStreamPlayer = pcm,
+            context = context
         ).also { it.testScope = this }
         return controller to holdSynthesis
     }
@@ -159,17 +174,25 @@ class PlaybackControllerTest {
     }
 
     @Test
-    fun setSpeedAppliesToPlayerEvenWhenIdle() = runTest {
+    fun setSpeedUpdatesStateForSynthesis() = runTest {
         val piper = mockk<PiperTtsEngine>(relaxed = true)
         val vc = mockk<VoiceConversionEngine>(relaxed = true)
         val pcm = mockk<PcmStreamPlayer>(relaxed = true)
-        every { pcm.setPlaybackSpeed(any()) } just runs
+        val planner = mockk<MultiLanguageTtsPlanner>(relaxed = true)
+        val voices = mockk<VoiceRepository>(relaxed = true)
 
-        val controller = LocalPlaybackController(TextSplitter(), piper, vc, pcm)
+        val context = mockk<Context>(relaxed = true)
+        val controller = LocalPlaybackController(
+            multiLanguageTtsPlanner = planner,
+            voiceRepository = voices,
+            piperTtsEngine = piper,
+            voiceConversionEngine = vc,
+            pcmStreamPlayer = pcm,
+            context = context
+        )
         controller.testScope = this
         controller.setSpeed(1.2f)
 
-        verify { pcm.setPlaybackSpeed(1.2f) }
         assertEquals(1.2f, controller.state.value.speed, 0.001f)
     }
 }

@@ -7,6 +7,7 @@ import com.voiceassistant.engine.audio.StudioRecorder
 import com.voiceassistant.engine.tts.SpeakerEmbeddingExtractor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
 
@@ -30,6 +31,10 @@ class CloneVoiceUseCase @Inject constructor(
         displayName: String,
         tags: List<String> = listOf("cloned", "user")
     ): VoiceModel {
+        val localeTag = Locale.getDefault().language
+            .takeIf { it.equals("vi", true) || it.equals("en", true) || it.equals("zh", true) }
+            ?: "vi"
+        val voiceTags = (tags + localeTag).distinct()
         val id = "clone_${UUID.randomUUID()}"
         val embDir = File(context.filesDir, "embeddings").apply { mkdirs() }
         val embFile = File(embDir, "$id.bin")
@@ -38,7 +43,7 @@ class CloneVoiceUseCase @Inject constructor(
         val voice = VoiceModel(
             id = id,
             name = displayName.ifBlank { "Giọng đã clone" },
-            tags = tags,
+            tags = voiceTags,
             embeddingPath = embFile.absolutePath,
             sampleAudioPath = sampleWav.absolutePath,
             modelAssetPath = null,
@@ -46,6 +51,7 @@ class CloneVoiceUseCase @Inject constructor(
             isPreset = false
         )
         voiceRepository.upsert(voice)
+        voiceRepository.setDefault(voice.id)
         return voice
     }
 

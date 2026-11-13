@@ -37,15 +37,29 @@ class VoiceRepositoryImpl @Inject constructor(
         dao.setDefault(id)
     }
 
+    override suspend fun listVoices(): List<VoiceModel> =
+        dao.listAll().map { it.toDomain() }
+
     override suspend fun seedPresetsIfEmpty() {
-        // Upsert built-in voices so label/default updates apply on existing installs too.
+        val existing = dao.listAll().associateBy { it.id }
+        val defaultId = existing.values.firstOrNull { it.isDefault }?.id
+        val firstInstall = existing.isEmpty()
+        // Upsert built-in voices so labels stay current; never reset user's default voice.
         val presets = listOf(
             VoiceModel(
                 id = "preset_vi_demo",
-                name = "Tiếng Việt",
+                name = "Tiếng Việt · MMS",
                 tags = listOf("system", "vi", "female"),
-                modelAssetPath = "models/piper/vi_VN-demo-low.onnx",
-                isDefault = true,
+                modelAssetPath = "models/sherpa/vits-mms-vie/model.onnx",
+                isDefault = false,
+                isPreset = true
+            ),
+            VoiceModel(
+                id = "preset_vi_piper_25h",
+                name = "Tiếng Việt · Piper 25h",
+                tags = listOf("system", "vi", "female"),
+                modelAssetPath = "models/piper/vi_VN-25hours_single-low.onnx",
+                isDefault = firstInstall,
                 isPreset = true
             ),
             VoiceModel(
@@ -63,8 +77,25 @@ class VoiceRepositoryImpl @Inject constructor(
                 modelAssetPath = "models/piper/en_US-ryan-low.onnx",
                 isDefault = false,
                 isPreset = true
+            ),
+            VoiceModel(
+                id = "preset_zh_melo",
+                name = "中文 · Melo (zh+en)",
+                tags = listOf("system", "zh", "zh-en", "bilingual"),
+                modelAssetPath = "models/sherpa/vits-melo-tts-zh_en/model.onnx",
+                isDefault = false,
+                isPreset = true
             )
         )
-        dao.upsertAll(presets.map { it.toEntity() })
+        val resolvedDefaultId = when {
+            firstInstall -> "preset_vi_piper_25h"
+            defaultId != null -> defaultId
+            else -> "preset_vi_piper_25h"
+        }
+        dao.upsertAll(
+            presets.map { preset ->
+                preset.copy(isDefault = preset.id == resolvedDefaultId).toEntity()
+            }
+        )
     }
 }

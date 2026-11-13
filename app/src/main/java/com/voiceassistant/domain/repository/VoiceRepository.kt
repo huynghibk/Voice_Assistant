@@ -11,4 +11,6 @@ interface VoiceRepository {
     suspend fun delete(id: String)
     suspend fun setDefault(id: String)
     suspend fun seedPresetsIfEmpty()
+
+    suspend fun listVoices(): List<VoiceModel>
 }
