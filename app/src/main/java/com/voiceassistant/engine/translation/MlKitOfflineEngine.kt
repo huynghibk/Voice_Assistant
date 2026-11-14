@@ -6,8 +6,10 @@ import com.google.mlkit.nl.translate.Translator
 import com.google.mlkit.nl.translate.TranslatorOptions
 import com.voiceassistant.domain.engine.TranslationEngine
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
@@ -18,6 +20,11 @@ import kotlin.coroutines.resumeWithException
  */
 @Singleton
 class MlKitOfflineEngine @Inject constructor() : TranslationEngine {
+
+    companion object {
+        private const val MODEL_DOWNLOAD_TIMEOUT_MS = 120_000L
+        private const val TRANSLATE_TIMEOUT_MS = 45_000L
+    }
 
     private val cache = mutableMapOf<String, Translator>()
 
@@ -51,18 +58,31 @@ class MlKitOfflineEngine @Inject constructor() : TranslationEngine {
     }
 
     private suspend fun ensureModelDownloaded(translator: Translator) {
-        suspendCancellableCoroutine { cont ->
-            val conditions = DownloadConditions.Builder().build()
-            translator.downloadModelIfNeeded(conditions)
-                .addOnSuccessListener { cont.resume(Unit) }
-                .addOnFailureListener { cont.resumeWithException(it) }
+        try {
+            withTimeout(MODEL_DOWNLOAD_TIMEOUT_MS) {
+                suspendCancellableCoroutine<Unit> { cont ->
+                    val conditions = DownloadConditions.Builder().build()
+                    translator.downloadModelIfNeeded(conditions)
+                        .addOnSuccessListener { cont.resume(Unit) }
+                        .addOnFailureListener { cont.resumeWithException(it) }
+                }
+            }
+        } catch (_: TimeoutCancellationException) {
+            throw IllegalStateException("Tải gói dịch offline quá thời gian chờ. Thử Wi‑Fi hoặc dịch trực tuyến.")
         }
     }
 
-    private suspend fun translateWith(translator: Translator, text: String): String =
-        suspendCancellableCoroutine { cont ->
-            translator.translate(text)
-                .addOnSuccessListener { cont.resume(it) }
-                .addOnFailureListener { cont.resumeWithException(it) }
+    private suspend fun translateWith(translator: Translator, text: String): String {
+        try {
+            return withTimeout(TRANSLATE_TIMEOUT_MS) {
+                suspendCancellableCoroutine<String> { cont ->
+                    translator.translate(text)
+                        .addOnSuccessListener { cont.resume(it) }
+                        .addOnFailureListener { cont.resumeWithException(it) }
+                }
+            }
+        } catch (_: TimeoutCancellationException) {
+            throw IllegalStateException("Dịch offline quá thời gian chờ.")
         }
+    }
 }

@@ -11,7 +11,14 @@ val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { load(it) }
 }
-val geminiApiKey: String = localProperties.getProperty("gemini.api.key", "")
+// Fallback when local.properties has no gemini.api.key — shipped so end users need not paste a key.
+// Anyone can extract it from the APK; override in local.properties for dev or save a personal key in Settings.
+val geminiBundledDefaultKey =
+    "AQ.Ab8RN6JqjYJhxfs6BbXD388dyqXG-ElPJpS-3boBkxi-QaPfrQ"
+val geminiApiKeyFromLocal: String = localProperties.getProperty("gemini.api.key", "").trim()
+val geminiApiKey: String =
+    if (geminiApiKeyFromLocal.isNotEmpty()) geminiApiKeyFromLocal else geminiBundledDefaultKey
+val geminiKeyIsBundled: Boolean = geminiApiKeyFromLocal.isEmpty()
 
 android {
     namespace = "com.voiceassistant"
@@ -27,8 +34,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
 
-        // Keep secret out of VCS — set gemini.api.key in local.properties
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+        buildConfigField("boolean", "GEMINI_KEY_BUNDLED", geminiKeyIsBundled.toString())
 
         // ARM for devices; x86_64 for Android Studio emulators
         ndk {

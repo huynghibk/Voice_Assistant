@@ -6,18 +6,24 @@ import com.voiceassistant.BuildConfig
 import com.voiceassistant.data.prefs.ApiKeyStore
 import com.voiceassistant.domain.engine.TranslationEngine
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Online translation via Gemini.
- * Resolves key: user EncryptedSharedPreferences → BuildConfig (`local.properties`).
+ * Resolves key: user Settings → local.properties (build) → bundled default in BuildConfig.
  */
 @Singleton
 class GeminiOnlineEngine @Inject constructor(
     private val apiKeyStore: ApiKeyStore
 ) : TranslationEngine {
+
+    companion object {
+        private const val REQUEST_TIMEOUT_MS = 60_000L
+    }
 
     @Volatile
     private var cachedKey: String? = null
@@ -65,7 +71,13 @@ class GeminiOnlineEngine @Inject constructor(
 
             val prompt = TranslationPrompts.geminiPrompt(text, sourceLang, targetLang)
 
-            val response = generativeModel.generateContent(prompt)
+            val response = try {
+                withTimeout(REQUEST_TIMEOUT_MS) {
+                    generativeModel.generateContent(prompt)
+                }
+            } catch (_: TimeoutCancellationException) {
+                error("Dịch trực tuyến quá thời gian chờ. Kiểm tra mạng hoặc thử lại.")
+            }
             val translated = response.text?.trim().orEmpty()
             if (translated.isBlank()) {
                 error("Gemini trả về kết quả trống.")

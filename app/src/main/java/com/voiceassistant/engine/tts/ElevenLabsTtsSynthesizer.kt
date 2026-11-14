@@ -19,15 +19,15 @@ class ElevenLabsTtsSynthesizer @Inject constructor(
 ) {
     suspend fun synthesize(
         text: String,
-        localeHint: Locale,
+        @Suppress("UNUSED_PARAMETER") localeHint: Locale,
         speechRate: Float
     ): Pair<FloatArray, Int> = withContext(Dispatchers.IO) {
         val apiKey = apiKeyStore.getElevenLabsApiKey()
-        if (apiKey.isBlank()) error("MISSING_ELEVENLABS_KEY")
+        if (apiKey.isBlank()) error(MISSING_KEY)
         val clean = text.trim()
         if (clean.isEmpty()) return@withContext FloatArray(0) to SAMPLE_RATE
 
-        val voiceId = pickVoiceId(localeHint)
+        val voiceId = MULTILINGUAL_VOICE_ID
         val url =
             "https://api.elevenlabs.io/v1/text-to-speech/$voiceId?output_format=pcm_${SAMPLE_RATE}"
         val body = JSONObject().apply {
@@ -80,14 +80,11 @@ class ElevenLabsTtsSynthesizer @Inject constructor(
         }
     }
 
-    private fun pickVoiceId(locale: Locale): String =
-        when (locale.language.lowercase(Locale.ROOT)) {
-            "vi", "zh", "ja", "ko" -> MULTILINGUAL_VOICE_ID
-            else -> MULTILINGUAL_VOICE_ID
-        }
-
     companion object {
         private const val SAMPLE_RATE = 24_000
         private const val MULTILINGUAL_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"
+
+        @Suppress("SpellCheckingInspection")
+        private const val MISSING_KEY = "MISSING_ELEVENLABS_KEY"
     }
 }

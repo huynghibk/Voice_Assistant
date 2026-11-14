@@ -23,6 +23,7 @@ data class SettingsUiState(
     val hasStoredKey: Boolean = false,
     val storedKeyMask: String = "",
     val keyFromBuildConfig: Boolean = false,
+    val keyBundledInApp: Boolean = false,
     val apiKeyMessage: String = "",
     val ttsBackend: TtsBackend = TtsBackend.SYSTEM_GOOGLE,
     val googleCloudTtsInput: String = "",
@@ -64,14 +65,17 @@ class SettingsViewModel @Inject constructor(
     private fun refreshKeyUi(): SettingsUiState {
         val user = apiKeyStore.hasUserKey()
         val fromBuild = BuildConfig.GEMINI_API_KEY.isNotBlank()
+        val bundled = !user && fromBuild && BuildConfig.GEMINI_KEY_BUNDLED
         return SettingsUiState(
             hasStoredKey = user || fromBuild,
             storedKeyMask = when {
                 user -> apiKeyStore.maskedKeyPreview()
+                bundled -> maskBuildConfigKey()
                 fromBuild -> "local.properties"
                 else -> ""
             },
-            keyFromBuildConfig = !user && fromBuild,
+            keyFromBuildConfig = !user && fromBuild && !bundled,
+            keyBundledInApp = bundled,
             hasGoogleCloudTtsKey = apiKeyStore.hasGoogleCloudTtsKey(),
             googleCloudTtsMask = apiKeyStore.maskedGoogleCloudTtsKeyPreview(),
             hasElevenLabsKey = apiKeyStore.hasElevenLabsKey(),
@@ -115,9 +119,19 @@ class SettingsViewModel @Inject constructor(
         _uiState.update {
             refreshKeyUi().copy(
                 apiKeyInput = "",
-                apiKeyMessage = "Đã xóa API key. Có thể dùng key trong local.properties nếu có."
+                apiKeyMessage = if (BuildConfig.GEMINI_KEY_BUNDLED) {
+                    "Đã xóa key cá nhân. App dùng key mặc định tích hợp sẵn."
+                } else {
+                    "Đã xóa API key. Có thể dùng key trong local.properties nếu có."
+                }
             )
         }
+    }
+
+    private fun maskBuildConfigKey(): String {
+        val key = BuildConfig.GEMINI_API_KEY
+        if (key.length <= 10) return "••••"
+        return key.take(4) + "•••" + key.takeLast(4)
     }
 
     fun onGoogleCloudTtsKeyChange(value: String) {

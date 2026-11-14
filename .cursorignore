@@ -5,3 +5,15 @@ app/build/
 *.apk
 *.aab
 *.log
+
+# Android / Gradle / Kotlin
+.gradle/
+build/
+**/build/
+*.apk
+*.aab
+*.dex
+*.ap_
+local.properties
+.cxx/
+captures/

@@ -97,6 +97,31 @@ class TranslationRoutingTest {
     }
 
     @Test
+    fun onlineOnlySkipsMlKitAndRequiresKey() = runTest {
+        every { network.isOnline() } returns true
+        every { gemini.hasApiKey() } returns false
+
+        val result = repository.translate("hi", "en", "vi", onlineOnly = true)
+
+        assertTrue(result.isFailure)
+        coVerify(exactly = 0) { gemini.translate(any(), any(), any()) }
+        coVerify(exactly = 0) { mlKit.translate(any(), any(), any()) }
+    }
+
+    @Test
+    fun onlineOnlyUsesGeminiOnly() = runTest {
+        every { network.isOnline() } returns true
+        every { gemini.hasApiKey() } returns true
+        coEvery { gemini.translate("hi", "en", "vi") } returns Result.success("xin chào")
+
+        val result = repository.translate("hi", "en", "vi", onlineOnly = true)
+
+        assertEquals("xin chào", result.getOrThrow())
+        coVerify(exactly = 1) { gemini.translate("hi", "en", "vi") }
+        coVerify(exactly = 0) { mlKit.translate(any(), any(), any()) }
+    }
+
+    @Test
     fun returnsFailureWhenBothEnginesFail() = runTest {
         every { network.isOnline() } returns true
         coEvery { gemini.translate(any(), any(), any()) } returns

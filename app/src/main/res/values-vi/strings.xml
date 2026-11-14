@@ -137,7 +137,7 @@
     <string name="settings_model_manager_subtitle">Trạng thái giọng Piper và các gói ML Kit ngoại tuyến</string>
     <string name="settings_ai_section">Cấu hình AI</string>
     <string name="settings_gemini_title">Gemini API Key</string>
-    <string name="settings_gemini_subtitle">Dán API key để dùng tính năng dịch AI trực tuyến</string>
+    <string name="settings_gemini_subtitle">Dịch online dùng key mặc định trong app. Dán key Google AI Studio riêng nếu muốn (tùy chọn).</string>
     <string name="settings_gemini_saved">Đã lưu API key cá nhân trên thiết bị này</string>
     <string name="settings_gemini_hint">AIza…</string>
     <string name="settings_gemini_help">Lấy key miễn phí từ Google AI Studio (nhấn để mở)</string>
@@ -145,6 +145,7 @@
     <string name="settings_gemini_clear">Xóa</string>
     <string name="settings_gemini_key_active">Key đang dùng: %1$s</string>
     <string name="settings_gemini_key_build">Key đang dùng từ %1$s (bản build dev)</string>
+    <string name="settings_gemini_key_bundled">Key dịch online mặc định: %1$s</string>
     <string name="settings_gemini_replace_hint">Dán key mới để thay thế key đã lưu…</string>
 
     <string name="model_manager_title">Trung tâm tải về</string>

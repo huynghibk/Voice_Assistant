@@ -154,7 +154,7 @@
     <string name="settings_model_manager_subtitle">Piper voice status and offline ML Kit packs</string>
     <string name="settings_ai_section">AI configuration</string>
     <string name="settings_gemini_title">Gemini API Key</string>
-    <string name="settings_gemini_subtitle">Paste your key to use online AI translation</string>
+    <string name="settings_gemini_subtitle">Online translate uses a built-in key. Paste your own Google AI Studio key (optional).</string>
     <string name="settings_gemini_saved">A personal key is saved on this device</string>
     <string name="settings_gemini_hint">AIza…</string>
     <string name="settings_gemini_help">Get a free key from Google AI Studio (tap to open)</string>
@@ -162,6 +162,7 @@
     <string name="settings_gemini_clear">Clear</string>
     <string name="settings_gemini_key_active">Active key: %1$s</string>
     <string name="settings_gemini_key_build">Active key from %1$s (developer build)</string>
+    <string name="settings_gemini_key_bundled">Built-in online key: %1$s</string>
     <string name="settings_gemini_replace_hint">Paste a new key to replace the saved one…</string>
 
     <string name="model_manager_title">Download Center</string>

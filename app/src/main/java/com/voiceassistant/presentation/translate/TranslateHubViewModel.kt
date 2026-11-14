@@ -192,7 +192,7 @@ class TranslateHubViewModel @Inject constructor(
 
     fun continueTranslateWithoutDownload() {
         dismissDownloadDialog()
-        runTranslate(resolvedSourceForTranslate)
+        runTranslate(resolvedSourceForTranslate, onlineOnly = true)
     }
 
     fun confirmDownloadAndTranslate() {
@@ -387,17 +387,19 @@ class TranslateHubViewModel @Inject constructor(
         appContext.getString(R.string.translate_status_done_offline)
     }
 
-    private fun runTranslate(sourceLang: String) {
+    private fun runTranslate(sourceLang: String, onlineOnly: Boolean = false) {
         val state = _uiState.value
         val text = state.text.trim()
         if (text.isEmpty()) return
         translateJob?.cancel()
         translateJob = viewModelScope.launch {
-            _uiState.update { it.copy(isTranslating = true, statusMessage = "Đang dịch…") }
+            val status = if (onlineOnly) "Đang dịch trực tuyến…" else "Đang dịch…"
+            _uiState.update { it.copy(isTranslating = true, statusMessage = status) }
             translationRepository.translate(
                 text = text,
                 sourceLang = sourceLang,
-                targetLang = state.selectedTargetLang
+                targetLang = state.selectedTargetLang,
+                onlineOnly = onlineOnly
             ).fold(
                 onSuccess = { translated ->
                     _uiState.update {

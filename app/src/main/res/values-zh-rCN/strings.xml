@@ -64,7 +64,7 @@
     <string name="settings_model_manager_subtitle">Piper 语音状态与离线 ML Kit 语言包</string>
     <string name="settings_ai_section">AI 配置</string>
     <string name="settings_gemini_title">Gemini API Key</string>
-    <string name="settings_gemini_subtitle">粘贴 API Key 以使用在线 AI 翻译</string>
+    <string name="settings_gemini_subtitle">在线翻译使用内置 Key。可粘贴自己的 Google AI Studio Key（可选）。</string>
     <string name="settings_gemini_saved">本机已保存个人 API Key</string>
     <string name="settings_gemini_hint">AIza…</string>
     <string name="settings_gemini_help">从 Google AI Studio 获取免费 Key（点击打开）</string>
@@ -72,6 +72,7 @@
     <string name="settings_gemini_clear">清除</string>
     <string name="settings_gemini_key_active">当前 Key：%1$s</string>
     <string name="settings_gemini_key_build">当前 Key 来自 %1$s（开发构建）</string>
+    <string name="settings_gemini_key_bundled">内置在线 Key：%1$s</string>
     <string name="settings_gemini_replace_hint">粘贴新 Key 以替换已保存的 Key…</string>
 
     <string name="model_manager_title">下载中心</string>

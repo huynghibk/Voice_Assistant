@@ -23,9 +23,27 @@ class TranslationRepositoryImpl @Inject constructor(
     override suspend fun translate(
         text: String,
         sourceLang: String,
-        targetLang: String
+        targetLang: String,
+        onlineOnly: Boolean
     ): Result<String> {
         if (text.isBlank()) return Result.success(text)
+
+        if (onlineOnly) {
+            if (!networkMonitor.isOnline()) {
+                return Result.failure(
+                    IllegalStateException("Không có kết nối mạng để dịch trực tuyến.")
+                )
+            }
+            if (!geminiOnlineEngine.hasApiKey()) {
+                return Result.failure(
+                    IllegalStateException(
+                        "Thiếu Gemini API key. Thêm trong Cài đặt hoặc local.properties."
+                    )
+                )
+            }
+            return geminiOnlineEngine.translate(text, sourceLang, targetLang)
+                .map { TranslationCasePreserver.restoreCasing(text, it) }
+        }
 
         if (networkMonitor.isOnline()) {
             val online = geminiOnlineEngine.translate(text, sourceLang, targetLang)

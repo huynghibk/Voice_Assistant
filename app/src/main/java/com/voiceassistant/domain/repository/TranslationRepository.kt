@@ -9,6 +9,7 @@ interface TranslationRepository {
     suspend fun translate(
         text: String,
         sourceLang: String,
-        targetLang: String
+        targetLang: String,
+        onlineOnly: Boolean = false
     ): Result<String>
 }

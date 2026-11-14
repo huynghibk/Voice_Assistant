@@ -157,19 +157,22 @@ fun SettingsScreen(
             SettingsRow(
                 icon = { Icon(Icons.Outlined.VpnKey, contentDescription = null) },
                 title = stringResource(R.string.settings_gemini_title),
-                subtitle = if (ui.hasStoredKey) {
-                    stringResource(R.string.settings_gemini_saved)
-                } else {
-                    stringResource(R.string.settings_gemini_subtitle)
+                subtitle = when {
+                    ui.keyBundledInApp -> stringResource(R.string.settings_gemini_subtitle)
+                    ui.hasStoredKey -> stringResource(R.string.settings_gemini_saved)
+                    else -> stringResource(R.string.settings_gemini_subtitle)
                 }
             )
             if (ui.hasStoredKey && ui.storedKeyMask.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = if (ui.keyFromBuildConfig) {
-                        stringResource(R.string.settings_gemini_key_build, ui.storedKeyMask)
-                    } else {
-                        stringResource(R.string.settings_gemini_key_active, ui.storedKeyMask)
+                    text = when {
+                        ui.keyBundledInApp ->
+                            stringResource(R.string.settings_gemini_key_bundled, ui.storedKeyMask)
+                        ui.keyFromBuildConfig ->
+                            stringResource(R.string.settings_gemini_key_build, ui.storedKeyMask)
+                        else ->
+                            stringResource(R.string.settings_gemini_key_active, ui.storedKeyMask)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary
